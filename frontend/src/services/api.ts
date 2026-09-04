@@ -103,6 +103,24 @@ export const apiService = {
     });
   },
 
+  // Direct Messaging
+  async getChatMessages(veteranId: string) {
+    return request<{ conversation_id: string; veteran_id: string; counselor_name: string; messages: any[] }>(
+      `/chat/messages?veteran_id=${veteranId}`
+    );
+  },
+
+  async sendChatMessage(veteranId: string, content: string, senderType: 'veteran' | 'counselor' = 'counselor') {
+    return request<any>('/chat/messages', {
+      method: 'POST',
+      body: JSON.stringify({
+        veteran_id: veteranId,
+        content,
+        sender_type: senderType,
+      }),
+    });
+  },
+
   // Health check
   async checkHealth(): Promise<boolean> {
     try {

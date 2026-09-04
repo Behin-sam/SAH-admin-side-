@@ -21,7 +21,6 @@ import PointsScreen from './src/screens/PointsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import AdminScreen from './src/screens/AdminScreen';
 import ChatScreen from './src/screens/ChatScreen';
-import VideoCallScreen from './src/screens/VideoCallScreen';
 import CrisisScreen from './src/screens/CrisisScreen';
 
 import { storage } from './src/services/storage';
@@ -128,7 +127,6 @@ function MainStack() {
           headerTintColor: theme.colors.espresso[900],
         }}
       />
-      <Stack.Screen name="VideoCall" component={VideoCallScreen} options={{ headerShown: false }} />
       <Stack.Screen
         name="Crisis"
         component={CrisisScreen}

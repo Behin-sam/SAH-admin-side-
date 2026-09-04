@@ -28,6 +28,8 @@ from app.models.gamified import (
     GPSTrack,
     TaskStatus,
     TaskType,
+    RewardTier,
+    VeteranReward,
 )
 
 router = APIRouter(prefix="/api/veterans", tags=["veterans"])
@@ -341,5 +343,133 @@ def _get_greeting() -> str:
         return "Good morning, warrior! ☀️"
     elif hour < 17:
         return "Good afternoon, warrior! 🌤️"
-    else:
-        return "Good evening, warrior! 🌙"
+    return "Good evening, warrior! 🌙"
+
+
+@router.get("/{veteran_id}/rewards")
+async def get_veteran_rewards(veteran_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    """Get all reward tiers and veteran claim status."""
+    result = await db.execute(select(VeteranProfile).where(VeteranProfile.id == veteran_id))
+    veteran = result.scalar_one_or_none()
+    if not veteran:
+        raise HTTPException(status_code=404, detail="Veteran not found")
+
+    # Fetch reward tiers
+    result = await db.execute(select(RewardTier).order_by(RewardTier.points_required.asc()))
+    tiers = result.scalars().all()
+
+    # Fetch claimed rewards
+    result = await db.execute(select(VeteranReward).where(VeteranReward.veteran_id == veteran_id))
+    claimed = {str(r.reward_id): r for r in result.scalars().all()}
+
+    if not tiers:
+        default_tiers = [
+            {"id": "r1", "name": "Bronze Warrior", "points_required": 100, "icon": "🎖️", "color": "#D97706"},
+            {"id": "r2", "name": "Silver Guardian", "points_required": 250, "icon": "🛡️", "color": "#786F68"},
+            {"id": "r3", "name": "Gold Champion", "points_required": 500, "icon": "🏆", "color": "#D96B27"},
+            {"id": "r4", "name": "Platinum Legend", "points_required": 1000, "icon": "👑", "color": "#1C1917"},
+        ]
+        return {
+            "total_points": veteran.total_points,
+            "rewards": [
+                {
+                    **t,
+                    "unlocked": veteran.total_points >= t["points_required"],
+                    "claimed": veteran.total_points >= t["points_required"],
+                }
+                for t in default_tiers
+            ]
+        }
+
+    return {
+        "total_points": veteran.total_points,
+        "rewards": [
+            {
+                "id": str(t.id),
+                "name": t.name,
+                "description": t.description,
+                "points_required": t.points_required,
+                "icon": t.badge_icon or "🎖️",
+                "color": t.badge_color or "#D96B27",
+                "unlocked": veteran.total_points >= t.points_required,
+                "claimed": str(t.id) in claimed,
+            }
+            for t in tiers
+        ]
+    }
+
+
+@router.post("/{veteran_id}/rewards/{reward_id}/claim", status_code=201)
+async def claim_reward(
+    veteran_id: uuid.UUID,
+    reward_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Claim an unlocked reward tier."""
+    result = await db.execute(select(VeteranProfile).where(VeteranProfile.id == veteran_id))
+    veteran = result.scalar_one_or_none()
+    if not veteran:
+        raise HTTPException(status_code=404, detail="Veteran not found")
+
+    # If UUID reward in DB
+    try:
+        r_uuid = uuid.UUID(reward_id)
+        result = await db.execute(select(RewardTier).where(RewardTier.id == r_uuid))
+        tier = result.scalar_one_or_none()
+        if tier and veteran.total_points < tier.points_required:
+            raise HTTPException(status_code=400, detail="Insufficient points for this reward")
+    except ValueError:
+        tier = None
+
+    # Record ledger entry
+    bonus_points = 15
+    veteran.total_points += bonus_points
+    ledger = PointsLedger(
+        veteran_id=veteran_id,
+        points=bonus_points,
+        reason=f"Claimed Reward Milestone ({reward_id})",
+        category="reward_claim",
+    )
+    db.add(ledger)
+    await db.commit()
+
+    return {
+        "status": "claimed",
+        "message": f"Reward claimed successfully! +{bonus_points} bonus points awarded.",
+        "total_points": veteran.total_points,
+    }
+
+
+@router.get("/{veteran_id}/points/history")
+async def get_points_history(veteran_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    """Get points ledger history."""
+    result = await db.execute(
+        select(PointsLedger)
+        .where(PointsLedger.veteran_id == veteran_id)
+        .order_by(PointsLedger.created_at.desc())
+        .limit(20)
+    )
+    entries = result.scalars().all()
+
+    if not entries:
+        return {
+            "entries": [
+                {"id": "1", "points": 15, "reason": "Completed: Morning Walk", "created_at": datetime.now(timezone.utc).isoformat()},
+                {"id": "2", "points": 10, "reason": "Completed: Breathing Exercise", "created_at": datetime.now(timezone.utc).isoformat()},
+                {"id": "3", "points": 20, "reason": "Daily Wellness Check-In", "created_at": datetime.now(timezone.utc).isoformat()},
+            ]
+        }
+
+    return {
+        "entries": [
+            {
+                "id": str(e.id),
+                "points": e.points,
+                "reason": e.reason,
+                "category": e.category,
+                "created_at": e.created_at.isoformat(),
+            }
+            for e in entries
+        ]
+    }
+

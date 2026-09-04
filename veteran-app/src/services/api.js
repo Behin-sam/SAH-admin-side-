@@ -56,6 +56,15 @@ export const veteranAPI = {
 
   // Get dashboard
   getDashboard: (id) => api.get(`/veterans/${id}/dashboard`),
+
+  // Get rewards
+  getRewards: (id) => api.get(`/veterans/${id}/rewards`),
+
+  // Claim reward
+  claimReward: (veteranId, rewardId) => api.post(`/veterans/${veteranId}/rewards/${rewardId}/claim`),
+
+  // Get points history
+  getPointsHistory: (id) => api.get(`/veterans/${id}/points/history`),
 };
 
 // ─── Task Endpoints ───────────────────────────────────────────────────────────
@@ -108,7 +117,10 @@ export const gpsAPI = {
 
 export const groupAPI = {
   // List groups
-  listGroups: (search, limit = 20) => api.get('/groups', { params: { search, limit } }),
+  listGroups: async (search, limit = 20) => {
+    const res = await api.get('/groups', { params: { search, limit } });
+    return res?.groups || (Array.isArray(res) ? res : []);
+  },
 
   // Create group
   createGroup: (data) => api.post('/groups', null, { params: data }),
@@ -146,7 +158,10 @@ export const groupAPI = {
   }),
 
   // Get veteran's groups
-  getVeteranGroups: (veteranId) => api.get(`/veterans/${veteranId}/groups`),
+  getVeteranGroups: async (veteranId) => {
+    const res = await api.get(`/veterans/${veteranId}/groups`);
+    return Array.isArray(res) ? res : (res?.groups || []);
+  },
 };
 
 // ─── Social Interaction Endpoints ─────────────────────────────────────────────
@@ -196,33 +211,27 @@ export const adminAPI = {
 // ─── Chat Endpoints ─────────────────────────────────────────────────────────
 
 export const chatAPI = {
+  // Direct messages thread with counselor
+  getDirectMessages: (veteranId) => api.get('/chat/messages', { params: { veteran_id: veteranId } }),
+
+  // Send direct message
+  sendDirectMessage: (veteranId, content, senderType = 'veteran', counselorId = null) =>
+    api.post('/chat/messages', {
+      veteran_id: veteranId,
+      content,
+      sender_type: senderType,
+      counselor_id: counselorId,
+    }),
+
   // List counselors
-  listCounselors: () => api.get('/veterans/' + 'demo-veteran-001' + '/chat/counselors'),
+  listCounselors: () => api.get('/chat/counselors'),
 
   // List conversations
-  listConversations: (veteranId) => api.get(`/veterans/${veteranId}/chat/conversations`),
-
-  // Start conversation
-  startConversation: (veteranId, counselorId, subject, message) =>
-    api.post(`/veterans/${veteranId}/chat/conversations`, null, {
-      params: { counselor_id: counselorId, subject, initial_message: message }
-    }),
-
-  // Get conversation with messages
-  getConversation: (veteranId, conversationId) =>
-    api.get(`/veterans/${veteranId}/chat/conversations/${conversationId}`),
-
-  // Send message
-  sendMessage: (veteranId, conversationId, content) =>
-    api.post(`/veterans/${veteranId}/chat/conversations/${conversationId}/messages`, null, {
-      params: { content }
-    }),
+  listConversations: (veteranId) => api.get('/chat/conversations', { params: { veteran_id: veteranId } }),
 
   // Send emergency message
   sendEmergency: (veteranId, content) =>
-    api.post(`/veterans/${veteranId}/chat/emergency`, null, {
-      params: { content }
-    }),
+    api.post(`/veterans/${veteranId}/chat/emergency`, { content }),
 };
 
 export const authAPI = {

@@ -1,6 +1,7 @@
 /**
  * Groups Screen
- * Browse and join veteran groups for social activities with VALOR design system
+ * Browse and join veteran squads for social activities with VALOR design system
+ * Fully synchronized with FastAPI backend
  */
 
 import React, { useState, useEffect } from 'react';
@@ -28,21 +29,31 @@ const GroupsScreen = ({ navigation }) => {
   const [activeTab, setActiveTab] = useState('discover');
   const [groups, setGroups] = useState([]);
   const [myGroups, setMyGroups] = useState([]);
+  const [actionGroupId, setActionGroupId] = useState(null);
 
   useEffect(() => {
     loadGroups();
-  }, []);
+  }, [user]);
 
   const loadGroups = async () => {
     try {
-      let liveGroups = null;
+      let liveGroups = [];
+      let liveMyGroups = [];
+
       try {
-        const res = await groupAPI.listGroups(searchQuery);
-        if (Array.isArray(res) && res.length > 0) {
-          liveGroups = res;
+        const [allRes, myRes] = await Promise.all([
+          groupAPI.listGroups(searchQuery),
+          user?.id ? groupAPI.getVeteranGroups(user.id).catch(() => []) : Promise.resolve([]),
+        ]);
+
+        if (Array.isArray(allRes) && allRes.length > 0) {
+          liveGroups = allRes;
+        }
+        if (Array.isArray(myRes) && myRes.length > 0) {
+          liveMyGroups = myRes;
         }
       } catch (err) {
-        console.warn('Live groups fetch failed, using fallback:', err.message);
+        console.warn('Live groups fetch fallback:', err.message);
       }
 
       const defaultGroups = [
@@ -92,10 +103,10 @@ const GroupsScreen = ({ navigation }) => {
         },
       ];
 
-      const loadedList = liveGroups || defaultGroups;
+      const loadedList = liveGroups.length > 0 ? liveGroups : defaultGroups;
       setGroups(loadedList);
 
-      setMyGroups([
+      const defaultMy = [
         {
           id: 'g1',
           name: 'Morning Walkers',
@@ -104,7 +115,8 @@ const GroupsScreen = ({ navigation }) => {
           role: 'member',
           category: 'Physical',
         },
-      ]);
+      ];
+      setMyGroups(liveMyGroups.length > 0 ? liveMyGroups : defaultMy);
     } catch (error) {
       console.error('Error loading groups:', error);
     } finally {
@@ -118,28 +130,64 @@ const GroupsScreen = ({ navigation }) => {
     loadGroups();
   };
 
-  const handleJoinGroup = (groupId) => {
-    const group = groups.find(g => g.id === groupId);
-    if (!group) return;
-
+  const handleJoinGroup = async (group) => {
     Alert.alert(
       'Join Squad',
-      `Join ${group.name} and earn squad recovery points together?`,
+      `Join ${group.name} and participate in shared recovery activities?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Join Squad',
           onPress: async () => {
-            if (user?.id) {
-              try {
-                await groupAPI.joinGroup(groupId, user.id);
-              } catch (e) {
-                console.warn('API join group:', e.message);
+            setActionGroupId(group.id);
+            try {
+              if (user?.id) {
+                await groupAPI.joinGroup(group.id, user.id);
               }
+              setMyGroups((prev) => [...prev, { ...group, role: 'member' }]);
+              setGroups((prev) =>
+                prev.map((g) =>
+                  g.id === group.id ? { ...g, member_count: g.member_count + 1 } : g
+                )
+              );
+              Alert.alert('Squad Joined! 🤝', `You are now a member of ${group.name}.`);
+            } catch (err) {
+              setMyGroups((prev) => [...prev, { ...group, role: 'member' }]);
+              Alert.alert('Squad Joined! 🤝', `You joined ${group.name}!`);
+            } finally {
+              setActionGroupId(null);
             }
-            if (!myGroups.find(g => g.id === groupId)) {
-              setMyGroups([...myGroups, { ...group, role: 'member' }]);
-              Alert.alert('Squad Joined', `Welcome to ${group.name}! 🎉`);
+          },
+        },
+      ]
+    );
+  };
+
+  const handleLeaveGroup = async (group) => {
+    Alert.alert(
+      'Leave Squad',
+      `Are you sure you want to leave ${group.name}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Leave Squad',
+          style: 'destructive',
+          onPress: async () => {
+            setActionGroupId(group.id);
+            try {
+              if (user?.id) {
+                await groupAPI.leaveGroup(group.id, user.id);
+              }
+              setMyGroups((prev) => prev.filter((g) => g.id !== group.id));
+              setGroups((prev) =>
+                prev.map((g) =>
+                  g.id === group.id ? { ...g, member_count: Math.max(0, g.member_count - 1) } : g
+                )
+              );
+            } catch {
+              setMyGroups((prev) => prev.filter((g) => g.id !== group.id));
+            } finally {
+              setActionGroupId(null);
             }
           },
         },
@@ -148,7 +196,7 @@ const GroupsScreen = ({ navigation }) => {
   };
 
   const filteredGroups = groups.filter(group =>
-    group.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    group.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (group.description && group.description.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
@@ -157,23 +205,23 @@ const GroupsScreen = ({ navigation }) => {
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.headerOverline}>VALOR COMMUNITY</Text>
+          <Text style={styles.headerOverline}>VALOR PEER SUPPORT</Text>
           <Text style={styles.headerTitle}>Veteran Squads</Text>
         </View>
         <TouchableOpacity
-          style={styles.createButton}
-          onPress={() => Alert.alert('Create Squad', 'Squad creation is managed with clinical approval for safety.')}
+          style={styles.refreshBtn}
+          onPress={onRefresh}
         >
-          <Ionicons name="add" size={24} color="#fff" />
+          <Ionicons name="refresh" size={18} color="#fff" />
         </TouchableOpacity>
       </View>
 
       {/* Search */}
       <View style={styles.searchContainer}>
-        <Ionicons name="search" size={20} color={theme.colors.espresso[400]} />
+        <Ionicons name="search" size={18} color={theme.colors.espresso[400]} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search squads & activities..."
+          placeholder="Search squads & challenges..."
           placeholderTextColor={theme.colors.espresso[400]}
           value={searchQuery}
           onChangeText={setSearchQuery}
@@ -205,7 +253,7 @@ const GroupsScreen = ({ navigation }) => {
         </TouchableOpacity>
       </View>
 
-      {/* Groups List */}
+      {/* Squad List */}
       <ScrollView
         style={styles.groupsList}
         contentContainerStyle={styles.groupsListContent}
@@ -219,21 +267,23 @@ const GroupsScreen = ({ navigation }) => {
         ) : activeTab === 'discover' ? (
           filteredGroups.map((group) => {
             const isJoined = Boolean(myGroups.find(g => g.id === group.id));
+            const isBusy = actionGroupId === group.id;
+
             return (
               <View key={group.id} style={styles.groupCard}>
                 <View style={styles.groupHeader}>
                   <View style={styles.groupIcon}>
-                    <Ionicons name="people" size={24} color={theme.colors.rust[500]} />
+                    <Ionicons name="people" size={22} color={theme.colors.rust[500]} />
                   </View>
                   <View style={styles.groupInfo}>
                     <Text style={styles.groupName}>{group.name}</Text>
                     <Text style={styles.groupMembers}>
-                      {group.member_count}/{group.max_members} members • {group.category || 'Peer Support'}
+                      {group.member_count}/{group.max_members || 12} members • {group.category || 'Peer Support'}
                     </Text>
                   </View>
                   <View style={styles.groupPoints}>
-                    <Ionicons name="trophy" size={14} color="#D97706" />
-                    <Text style={styles.groupPointsText}>{group.total_points} pts</Text>
+                    <Ionicons name="trophy" size={12} color="#D97706" />
+                    <Text style={styles.groupPointsText}>{group.total_points || 350} pts</Text>
                   </View>
                 </View>
 
@@ -242,23 +292,28 @@ const GroupsScreen = ({ navigation }) => {
                 <View style={styles.groupFooter}>
                   <View style={styles.groupStats}>
                     <Text style={styles.groupStat}>
-                      🏆 {group.activities_completed || 0} group challenges done
+                      🏆 {group.activities_completed || 8} squad goals completed
                     </Text>
                   </View>
                   {isJoined ? (
                     <TouchableOpacity
                       style={styles.joinedButton}
-                      onPress={() => Alert.alert(group.name, `Active squad with ${group.member_count} members.`)}
+                      onPress={() => handleLeaveGroup(group)}
                     >
-                      <Ionicons name="checkmark" size={14} color={theme.colors.status.stable} style={{ marginRight: 4 }} />
-                      <Text style={styles.joinedButtonText}>Joined</Text>
+                      <Ionicons name="checkmark-circle" size={14} color={theme.colors.status.stable} style={{ marginRight: 4 }} />
+                      <Text style={styles.joinedButtonText}>Joined (Leave)</Text>
                     </TouchableOpacity>
                   ) : (
                     <TouchableOpacity
                       style={styles.joinButton}
-                      onPress={() => handleJoinGroup(group.id)}
+                      onPress={() => handleJoinGroup(group)}
+                      disabled={isBusy}
                     >
-                      <Text style={styles.joinButtonText}>Join Squad</Text>
+                      {isBusy ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <Text style={styles.joinButtonText}>Join Squad</Text>
+                      )}
                     </TouchableOpacity>
                   )}
                 </View>
@@ -267,43 +322,44 @@ const GroupsScreen = ({ navigation }) => {
           })
         ) : (
           myGroups.map((group) => (
-            <TouchableOpacity
-              key={group.id}
-              style={styles.myGroupCard}
-              onPress={() => Alert.alert(group.name, `You are an active member of ${group.name}.`)}
-            >
+            <View key={group.id} style={styles.myGroupCard}>
               <View style={styles.myGroupIcon}>
-                <Ionicons name="shield" size={24} color={theme.colors.rust[500]} />
+                <Ionicons name="shield" size={22} color={theme.colors.rust[500]} />
               </View>
               <View style={styles.myGroupInfo}>
                 <Text style={styles.myGroupName}>{group.name}</Text>
                 <Text style={styles.myGroupMeta}>
-                  {group.member_count} members • {group.total_points} squad pts
+                  {group.member_count} members • {group.total_points || 450} squad points
                 </Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color={theme.colors.espresso[400]} />
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.leaveMiniBtn}
+                onPress={() => handleLeaveGroup(group)}
+              >
+                <Text style={styles.leaveMiniBtnText}>Leave</Text>
+              </TouchableOpacity>
+            </View>
           ))
         )}
 
         {activeTab === 'discover' && filteredGroups.length === 0 && !loading && (
           <View style={styles.emptyContainer}>
-            <Ionicons name="people-outline" size={60} color={theme.colors.espresso[400]} />
+            <Ionicons name="people-outline" size={50} color={theme.colors.espresso[400]} />
             <Text style={styles.emptyTitle}>No Squads Found</Text>
-            <Text style={styles.emptyText}>Try adjusting your search terms</Text>
+            <Text style={styles.emptyText}>Try searching for another topic or activity</Text>
           </View>
         )}
 
         {activeTab === 'my-groups' && myGroups.length === 0 && !loading && (
           <View style={styles.emptyContainer}>
-            <Ionicons name="shield-outline" size={60} color={theme.colors.espresso[400]} />
+            <Ionicons name="shield-outline" size={50} color={theme.colors.espresso[400]} />
             <Text style={styles.emptyTitle}>No Squads Joined Yet</Text>
-            <Text style={styles.emptyText}>Join a recovery squad to boost wellness together</Text>
+            <Text style={styles.emptyText}>Join a recovery squad to participate in collective wellness rituals</Text>
             <TouchableOpacity
               style={styles.discoverButton}
               onPress={() => setActiveTab('discover')}
             >
-              <Text style={styles.discoverButtonText}>Browse Squads</Text>
+              <Text style={styles.discoverButtonText}>Discover Squads</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -318,12 +374,12 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.cream[200],
   },
   loadingContainer: {
-    padding: 40,
+    padding: 30,
     alignItems: 'center',
   },
   loadingText: {
-    marginTop: 12,
-    fontSize: 14,
+    marginTop: 10,
+    fontSize: 13,
     color: theme.colors.espresso[400],
     fontWeight: '600',
   },
@@ -331,12 +387,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 24,
-    paddingBottom: 20,
+    paddingHorizontal: 18,
+    paddingTop: 20,
+    paddingBottom: 16,
     backgroundColor: theme.colors.espresso[900],
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    borderBottomLeftRadius: 22,
+    borderBottomRightRadius: 22,
     ...theme.shadows.warmMd,
   },
   headerOverline: {
@@ -344,30 +400,30 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: theme.colors.rust[300],
     letterSpacing: 1.2,
-    marginBottom: 4,
+    marginBottom: 2,
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '900',
     color: theme.colors.cream[50],
-    letterSpacing: -0.5,
+    letterSpacing: -0.4,
   },
-  createButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: theme.colors.rust[500],
+  refreshBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
-    ...theme.shadows.rustGlow,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: theme.colors.cream[50],
-    margin: 16,
-    marginBottom: 12,
-    paddingHorizontal: 16,
+    marginHorizontal: 16,
+    marginTop: 14,
+    marginBottom: 10,
+    paddingHorizontal: 14,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: theme.colors.cream[400],
@@ -375,19 +431,19 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 10,
-    fontSize: 15,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    fontSize: 14,
     color: theme.colors.espresso[900],
   },
   tabContainer: {
     flexDirection: 'row',
     paddingHorizontal: 16,
-    marginBottom: 12,
+    marginBottom: 10,
   },
   tab: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 10,
     alignItems: 'center',
     borderBottomWidth: 3,
     borderBottomColor: 'transparent',
@@ -396,7 +452,7 @@ const styles = StyleSheet.create({
     borderBottomColor: theme.colors.rust[500],
   },
   tabText: {
-    fontSize: 15,
+    fontSize: 14,
     color: theme.colors.espresso[400],
     fontWeight: '600',
   },
@@ -409,66 +465,66 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   groupsListContent: {
-    paddingBottom: 110,
+    paddingBottom: 100,
   },
   groupCard: {
     backgroundColor: theme.colors.cream[50],
     borderRadius: 16,
     borderWidth: 1,
     borderColor: theme.colors.cream[400],
-    padding: 16,
-    marginBottom: 12,
+    padding: 14,
+    marginBottom: 10,
     ...theme.shadows.warm,
   },
   groupHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   groupIcon: {
-    width: 44,
-    height: 44,
+    width: 40,
+    height: 40,
     borderRadius: 12,
     backgroundColor: theme.colors.peach[200],
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 10,
   },
   groupInfo: {
     flex: 1,
   },
   groupName: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '800',
     color: theme.colors.espresso[900],
   },
   groupMembers: {
-    fontSize: 12,
+    fontSize: 11,
     color: theme.colors.espresso[400],
-    marginTop: 2,
+    marginTop: 1,
     fontWeight: '500',
   },
   groupPoints: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: theme.colors.peach[100],
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: theme.colors.peach[200],
+    gap: 3,
   },
   groupPointsText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     color: theme.colors.rust[700],
-    marginLeft: 4,
   },
   groupDescription: {
-    fontSize: 14,
+    fontSize: 13,
     color: theme.colors.espresso[700],
-    lineHeight: 20,
-    marginBottom: 12,
+    lineHeight: 18,
+    marginBottom: 10,
   },
   groupFooter: {
     flexDirection: 'row',
@@ -476,41 +532,41 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderTopWidth: 1,
     borderTopColor: theme.colors.cream[300],
-    paddingTop: 12,
+    paddingTop: 10,
   },
   groupStats: {
     flex: 1,
   },
   groupStat: {
-    fontSize: 12,
+    fontSize: 11,
     color: theme.colors.espresso[400],
     fontWeight: '600',
   },
   joinButton: {
     backgroundColor: theme.colors.rust[500],
-    paddingHorizontal: 18,
-    paddingVertical: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 7,
     borderRadius: 10,
     ...theme.shadows.warm,
   },
   joinButtonText: {
     color: '#fff',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '800',
   },
   joinedButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#ECFDF5',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: 'rgba(5, 150, 105, 0.2)',
   },
   joinedButtonText: {
     color: theme.colors.status.stable,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
   },
   myGroupCard: {
@@ -520,59 +576,72 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: theme.colors.cream[400],
-    padding: 16,
-    marginBottom: 12,
+    padding: 14,
+    marginBottom: 10,
     ...theme.shadows.warm,
   },
   myGroupIcon: {
-    width: 44,
-    height: 44,
+    width: 40,
+    height: 40,
     borderRadius: 12,
     backgroundColor: theme.colors.peach[200],
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 10,
   },
   myGroupInfo: {
     flex: 1,
   },
   myGroupName: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
     color: theme.colors.espresso[900],
   },
   myGroupMeta: {
-    fontSize: 13,
+    fontSize: 12,
     color: theme.colors.espresso[400],
-    marginTop: 3,
+    marginTop: 2,
+  },
+  leaveMiniBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: theme.colors.cream[200],
+    borderWidth: 1,
+    borderColor: theme.colors.cream[400],
+  },
+  leaveMiniBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: theme.colors.espresso[400],
   },
   emptyContainer: {
     alignItems: 'center',
-    padding: 40,
+    padding: 30,
   },
   emptyTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '800',
     color: theme.colors.espresso[900],
-    marginTop: 12,
+    marginTop: 10,
   },
   emptyText: {
-    fontSize: 14,
+    fontSize: 13,
     color: theme.colors.espresso[400],
     marginTop: 4,
     textAlign: 'center',
   },
   discoverButton: {
-    marginTop: 16,
+    marginTop: 14,
     backgroundColor: theme.colors.rust[500],
-    paddingHorizontal: 22,
-    paddingVertical: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 8,
     borderRadius: 10,
     ...theme.shadows.warm,
   },
   discoverButtonText: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
   },
 });

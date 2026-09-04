@@ -23,7 +23,9 @@ from app.models.gamified import (
     PointsLedger,
     TaskStatus,
     TaskType,
+    RewardTier,
 )
+from app.models.chat import ChatConversation, ChatMessage
 from seed_questions import seed_question_bank
 
 
@@ -31,7 +33,7 @@ VET_1_ID = uuid.UUID("550e8400-e29b-41d4-a716-446655440001")
 VET_2_ID = uuid.UUID("550e8400-e29b-41d4-a716-446655440002")
 VET_3_ID = uuid.UUID("550e8400-e29b-41d4-a716-446655440003")
 
-COUNSELOR_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
+COUNSELOR_ID = uuid.UUID("c0000000-0000-0000-0000-000000000001")
 
 
 async def seed():
@@ -248,8 +250,71 @@ async def seed():
             case_notes="Routines well integrated.",
         ))
 
+        # Seed Reward Tiers
+        r1 = RewardTier(
+            name="Bronze Warrior",
+            description="Achieved initial 100 recovery points milestone",
+            points_required=100,
+            badge_icon="🎖️",
+            badge_color="#D97706",
+            reward_type="badge",
+        )
+        r2 = RewardTier(
+            name="Silver Guardian",
+            description="Earned 250 points with strong task consistency",
+            points_required=250,
+            badge_icon="🛡️",
+            badge_color="#786F68",
+            reward_type="badge",
+        )
+        r3 = RewardTier(
+            name="Gold Champion",
+            description="500 points milestone - exemplary discipline & wellness",
+            points_required=500,
+            badge_icon="🏆",
+            badge_color="#D96B27",
+            reward_type="badge",
+        )
+        r4 = RewardTier(
+            name="Platinum Legend",
+            description="1000 points - Veteran Peer Leader & Mentor status",
+            points_required=1000,
+            badge_icon="👑",
+            badge_color="#1C1917",
+            reward_type="badge",
+        )
+        session.add_all([r1, r2, r3, r4])
+
+        # Seed Chat Conversation & Message Thread
+        conv = ChatConversation(
+            veteran_id=VET_1_ID,
+            counselor_id=COUNSELOR_ID,
+            subject="Clinical Care & Grounding",
+            status="active",
+            last_message="Hello Capt. Vikram! I reviewed your 5-day streak. Great discipline on the morning walks.",
+            last_message_at=datetime.now(timezone.utc),
+        )
+        session.add(conv)
+        await session.flush()
+
+        m1 = ChatMessage(
+            conversation_id=conv.id,
+            sender_id=COUNSELOR_ID,
+            sender_type="counselor",
+            content="Hello Capt. Vikram! I reviewed your 5-day streak. Great discipline on the morning walks.",
+            created_at=datetime.now(timezone.utc) - timedelta(hours=2),
+        )
+        m2 = ChatMessage(
+            conversation_id=conv.id,
+            sender_id=VET_1_ID,
+            sender_type="veteran",
+            content="Thank you Dr. Nair. The grounding technique really helped with the sensory overload yesterday.",
+            created_at=datetime.now(timezone.utc) - timedelta(hours=1),
+        )
+        session.add_all([m1, m2])
+
         await session.commit()
-        print("Database seeded successfully with demo veterans, counselor, tasks, and groups!")
+        print("Database seeded successfully with demo veterans, counselor, tasks, groups, rewards, and chat!")
 
 
 if __name__ == "__main__":
