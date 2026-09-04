@@ -6,7 +6,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { StatusBar } from 'expo-status-bar';
-import { Text, View, ActivityIndicator } from 'react-native';
+import { Text, View, ActivityIndicator, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import LoginScreen from './src/screens/LoginScreen';
@@ -168,9 +168,14 @@ export default function App() {
   }, []);
 
   const setupNotifications = async () => {
-    const granted = await notificationService.requestPermission();
-    if (granted) {
-      await notificationService.scheduleDailyReminder(9, 0);
+    try {
+      if (Platform.OS === 'web') return;
+      const granted = await notificationService.requestPermission();
+      if (granted) {
+        await notificationService.scheduleDailyReminder(9, 0);
+      }
+    } catch (e) {
+      console.warn('Notifications setup skipped:', e);
     }
   };
 

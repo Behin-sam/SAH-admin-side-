@@ -7,37 +7,46 @@ import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
 // Configure notification behavior
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
-});
+if (Platform.OS !== 'web') {
+  try {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+      }),
+    });
+  } catch (e) {
+    console.warn('Notifications handler init skipped:', e);
+  }
+}
 
 export const notificationService = {
   // ─── Permission ──────────────────────────────────────────────────────────
 
   requestPermission: async () => {
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
-    let finalStatus = existingStatus;
+    if (Platform.OS === 'web') return false;
+    try {
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
 
-    if (existingStatus !== 'granted') {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
-    }
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
 
-    if (finalStatus !== 'granted') {
-      return false;
-    }
+      if (finalStatus !== 'granted') {
+        return false;
+      }
 
-    // Get push token
-    if (Platform.OS !== 'web') {
+      // Get push token
       const token = await Notifications.getExpoPushTokenAsync();
       console.log('Push token:', token.data);
+      return true;
+    } catch (e) {
+      console.warn('Notifications permission request failed:', e);
+      return false;
     }
-
-    return true;
   },
 
   // ─── Task Reminders ──────────────────────────────────────────────────────

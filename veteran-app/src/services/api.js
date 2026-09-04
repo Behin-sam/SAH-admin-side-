@@ -98,13 +98,14 @@ export const gpsAPI = {
   recordPoint: (veteranId, data) => api.post('/veterans/' + veteranId + '/gps/track', null, { params: data }),
 
   // Record batch GPS points
-  recordBatch: (veteranId, points, taskId) => api.post('/veterans/' + veteranId + '/gps/track/batch', {
+  recordBatch: (veteranId, points, taskId = null) => api.post('/veterans/' + veteranId + '/gps/track/batch', {
     points,
     task_id: taskId,
   }),
 
   // Get GPS track for task
   getTrack: (veteranId, taskId) => api.get(`/veterans/${veteranId}/gps/track/${taskId}`),
+  getTaskTrack: (veteranId, taskId) => api.get(`/veterans/${veteranId}/gps/track/${taskId}`),
 
   // Get GPS history
   getHistory: (veteranId, days = 30) => api.get(`/veterans/${veteranId}/gps/history`, { params: { days } }),
@@ -242,19 +243,6 @@ export const authAPI = {
   login: (email, password, role = 'veteran') => api.post('/auth/login', { email, password, role }),
   register: (data) => api.post('/auth/register', data),
   getDemoUsers: () => api.get('/auth/demo-users'),
-};
-
-export const gpsAPI = {
-  recordPoint: (veteranId, pointData) =>
-    api.post(`/veterans/${veteranId}/gps/track`, null, { params: pointData }),
-  recordBatch: (veteranId, points, taskId = null) =>
-    api.post(`/veterans/${veteranId}/gps/track/batch`, { points, task_id: taskId }),
-  getTaskTrack: (veteranId, taskId) =>
-    api.get(`/veterans/${veteranId}/gps/track/${taskId}`),
-  getHistory: (veteranId) =>
-    api.get(`/veterans/${veteranId}/gps/history`),
-  getStats: (veteranId) =>
-    api.get(`/veterans/${veteranId}/gps/stats`),
 };
 
 export default api;
