@@ -121,6 +121,74 @@ export const apiService = {
     });
   },
 
+  // Squads & Peer Groups Endpoints
+  async getGroups(search?: string) {
+    const query = search ? `?search=${encodeURIComponent(search)}` : '';
+    return request<{ groups: any[]; total: number }>(`/groups${query}`);
+  },
+
+  async getGroup(groupId: string) {
+    return request<any>(`/groups/${groupId}`);
+  },
+
+  async getVeteranGroups(veteranId: string) {
+    return request<{ veteran_id: string; groups: any[]; total: number }>(`/veterans/${veteranId}/groups`);
+  },
+
+  async joinGroup(groupId: string, veteranId: string) {
+    return request<{ message: string; group_id: string; points_earned: number }>(
+      `/groups/${groupId}/join?veteran_id=${veteranId}`,
+      { method: 'POST' }
+    );
+  },
+
+  async leaveGroup(groupId: string, veteranId: string) {
+    return request<{ message: string; group_id: string }>(
+      `/groups/${groupId}/leave?veteran_id=${veteranId}`,
+      { method: 'POST' }
+    );
+  },
+
+  async createGroup(data: { name: string; created_by: string; description?: string; max_members?: number; is_public?: boolean }) {
+    return request<any>('/groups', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async getGroupActivities(groupId: string) {
+    return request<{ group_id: string; activities: any[] }>(`/groups/${groupId}/activities`);
+  },
+
+  async joinGroupActivity(groupId: string, activityId: string, veteranId: string) {
+    return request<any>(`/groups/${groupId}/activities/${activityId}/join?veteran_id=${veteranId}`, {
+      method: 'POST',
+    });
+  },
+
+  async completeGroupActivity(groupId: string, activityId: string, veteranId: string) {
+    return request<any>(`/groups/${groupId}/activities/${activityId}/complete?veteran_id=${veteranId}`, {
+      method: 'POST',
+    });
+  },
+
+  async getGroupMembers(groupId: string) {
+    return request<{ group_id: string; members: any[]; count: number }>(`/groups/${groupId}/members`);
+  },
+
+  async getGroupMessages(groupId: string) {
+    return request<{ group_id: string; messages: any[] }>(`/groups/${groupId}/messages`);
+  },
+
+  async postGroupMessage(groupId: string, params: { sender_id: string; message: string; cheer_type?: string; sender_name?: string; sender_rank?: string }) {
+    const query = new URLSearchParams(params as any).toString();
+    return request<any>(`/groups/${groupId}/messages?${query}`, { method: 'POST' });
+  },
+
+  async likeGroupMessage(groupId: string, messageId: string) {
+    return request<any>(`/groups/${groupId}/messages/${messageId}/like`, { method: 'POST' });
+  },
+
   // Health check
   async checkHealth(): Promise<boolean> {
     try {

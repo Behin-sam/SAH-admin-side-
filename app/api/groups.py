@@ -25,12 +25,14 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.models import SurvivorProfile
 from app.models.gamified import (
     VeteranProfile,
     VeteranGroup,
     GroupMembership,
     GroupActivity,
     GroupActivityParticipant,
+    GroupMessage,
     PointsLedger,
     SocialInteraction,
     GroupRole,
@@ -78,27 +80,48 @@ async def list_groups(
     }
 
 
+from pydantic import BaseModel
+
+
+class CreateGroupRequest(BaseModel):
+    name: str
+    created_by: uuid.UUID
+    description: str | None = None
+    max_members: int = 50
+    is_public: bool = True
+
+
 @router.post("/api/groups", status_code=201)
 async def create_group(
-    name: str,
-    created_by: uuid.UUID,
+    req: CreateGroupRequest | None = None,
+    name: str | None = None,
+    created_by: uuid.UUID | None = None,
     description: str | None = None,
-    max_members: int = 10,
+    max_members: int = 50,
     is_public: bool = True,
     db: AsyncSession = Depends(get_db),
 ):
     """Create a new veteran group."""
+    actual_name = (req.name if req else name)
+    actual_creator = (req.created_by if req else created_by)
+    actual_desc = (req.description if req else description)
+    actual_max = (req.max_members if req else max_members) or 50
+    actual_public = (req.is_public if req else is_public)
+
+    if not actual_name or not actual_creator:
+        raise HTTPException(status_code=400, detail="Missing name or created_by")
+
     # Verify creator exists
-    result = await db.execute(select(VeteranProfile).where(VeteranProfile.id == created_by))
+    result = await db.execute(select(VeteranProfile).where(VeteranProfile.id == actual_creator))
     if not result.scalar_one_or_none():
         raise HTTPException(status_code=404, detail="Veteran not found")
 
     group = VeteranGroup(
-        name=name,
-        description=description,
-        created_by=created_by,
-        max_members=max_members,
-        is_public=is_public,
+        name=actual_name,
+        description=actual_desc,
+        created_by=actual_creator,
+        max_members=actual_max,
+        is_public=actual_public,
         member_count=1,
     )
     db.add(group)
@@ -107,21 +130,21 @@ async def create_group(
     # Add creator as admin
     membership = GroupMembership(
         group_id=group.id,
-        veteran_id=created_by,
+        veteran_id=actual_creator,
         role=GroupRole.ADMIN,
     )
     db.add(membership)
 
     # Update veteran's group count
-    result = await db.execute(select(VeteranProfile).where(VeteranProfile.id == created_by))
+    result = await db.execute(select(VeteranProfile).where(VeteranProfile.id == actual_creator))
     veteran = result.scalar_one()
     veteran.groups_joined += 1
 
     # Award points for creating a group
     points_entry = PointsLedger(
-        veteran_id=created_by,
+        veteran_id=actual_creator,
         points=25,
-        reason=f"Created group: {name}",
+        reason=f"Founded group: {actual_name}",
         category="group_creation",
     )
     db.add(points_entry)
@@ -132,8 +155,11 @@ async def create_group(
         "name": group.name,
         "description": group.description,
         "member_count": 1,
-        "created_at": group.created_at.isoformat(),
-        "message": "Group created! You've earned 25 points! 🎉",
+        "max_members": group.max_members,
+        "total_points": 0,
+        "activities_completed": 0,
+        "message": f"Squad '{group.name}' commissioned! 🎖️",
+        "points_earned": 25,
     }
 
 
@@ -191,8 +217,9 @@ async def join_group(
     if not group:
         raise HTTPException(status_code=404, detail="Group not found")
 
-    if group.member_count >= group.max_members:
-        raise HTTPException(status_code=400, detail="Group is full")
+    if group.max_members and group.member_count >= group.max_members:
+        # Automatically expand squad size so comrades are never blocked from joining
+        group.max_members = max(group.max_members + 25, group.member_count + 10)
 
     # Check if existing membership record exists
     result = await db.execute(
@@ -204,7 +231,11 @@ async def join_group(
     existing_membership = result.scalar_one_or_none()
     if existing_membership:
         if existing_membership.is_active:
-            raise HTTPException(status_code=409, detail="Already a member")
+            return {
+                "message": f"Already an active member of {group.name}! 🤝",
+                "group_id": str(group.id),
+                "points_earned": 0,
+            }
         # Reactivate existing membership
         existing_membership.is_active = True
         existing_membership.joined_at = datetime.now(timezone.utc)
@@ -272,10 +303,11 @@ async def leave_group(
 
 @router.get("/api/groups/{group_id}/members")
 async def list_members(group_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
-    """List group members."""
+    """List group members with real names and ranks."""
     result = await db.execute(
-        select(GroupMembership, VeteranProfile)
+        select(GroupMembership, VeteranProfile, SurvivorProfile)
         .join(VeteranProfile, GroupMembership.veteran_id == VeteranProfile.id)
+        .outerjoin(SurvivorProfile, VeteranProfile.survivor_id == SurvivorProfile.id)
         .where(
             GroupMembership.group_id == group_id,
             GroupMembership.is_active == True,
@@ -284,12 +316,15 @@ async def list_members(group_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     members = [
         {
             "veteran_id": str(m.veteran_id),
-            "role": m.role.value,
+            "name": surv.preferred_language if surv and surv.preferred_language else "Comrade",
+            "rank": v.rank or "Soldier",
+            "service_branch": v.service_branch or "Indian Army",
+            "role": m.role.value if hasattr(m.role, 'value') else str(m.role),
             "joined_at": m.joined_at.isoformat(),
             "total_points": v.total_points,
             "current_streak": v.current_streak,
         }
-        for m, v in result.all()
+        for m, v, surv in result.all()
     ]
 
     return {
@@ -297,6 +332,112 @@ async def list_members(group_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
         "members": members,
         "count": len(members),
     }
+
+
+# ─── Squad Cheer Board & Messaging ──────────────────────────────────────────
+
+@router.get("/api/groups/{group_id}/messages")
+async def list_group_messages(
+    group_id: uuid.UUID,
+    limit: int = 50,
+    db: AsyncSession = Depends(get_db),
+):
+    """List recent squad cheer board messages."""
+    result = await db.execute(
+        select(GroupMessage)
+        .where(GroupMessage.group_id == group_id)
+        .order_by(GroupMessage.created_at.desc())
+        .limit(limit)
+    )
+    messages = result.scalars().all()
+    return {
+        "group_id": str(group_id),
+        "messages": [
+            {
+                "id": str(msg.id),
+                "sender_id": str(msg.sender_id),
+                "sender_name": msg.sender_name,
+                "sender_rank": msg.sender_rank,
+                "message": msg.message,
+                "cheer_type": msg.cheer_type,
+                "likes_count": msg.likes_count,
+                "created_at": msg.created_at.isoformat(),
+            }
+            for msg in reversed(messages)
+        ],
+    }
+
+
+@router.post("/api/groups/{group_id}/messages", status_code=201)
+async def post_group_message(
+    group_id: uuid.UUID,
+    sender_id: uuid.UUID,
+    message: str,
+    cheer_type: str = "cheer",
+    sender_name: str | None = None,
+    sender_rank: str | None = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """Post an encouragement cheer to the squad board and earn +5 XP."""
+    name = sender_name
+    rank = sender_rank
+    if not name:
+        res = await db.execute(
+            select(VeteranProfile, SurvivorProfile)
+            .join(SurvivorProfile, VeteranProfile.survivor_id == SurvivorProfile.id)
+            .where(VeteranProfile.id == sender_id)
+        )
+        row = res.first()
+        if row:
+            vet, surv = row
+            name = surv.preferred_language or "Comrade"
+            rank = vet.rank or "Soldier"
+
+    new_msg = GroupMessage(
+        group_id=group_id,
+        sender_id=sender_id,
+        sender_name=name or "Comrade",
+        sender_rank=rank or "Soldier",
+        message=message,
+        cheer_type=cheer_type,
+    )
+    db.add(new_msg)
+
+    # Award points for peer support (+5 pts)
+    res_vet = await db.execute(select(VeteranProfile).where(VeteranProfile.id == sender_id))
+    vet_obj = res_vet.scalar_one_or_none()
+    if vet_obj:
+        vet_obj.total_points += 5
+        db.add(PointsLedger(
+            veteran_id=sender_id,
+            points=5,
+            reason="Posted squad cheer message",
+            category="peer_support",
+        ))
+
+    return {
+        "message": "Cheer posted to squad board! 💬",
+        "points_earned": 5,
+        "message_id": str(new_msg.id),
+    }
+
+
+@router.post("/api/groups/{group_id}/messages/{message_id}/like")
+async def like_group_message(
+    group_id: uuid.UUID,
+    message_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    """Applaud/like a squad message."""
+    res = await db.execute(
+        select(GroupMessage).where(GroupMessage.id == message_id, GroupMessage.group_id == group_id)
+    )
+    msg = res.scalar_one_or_none()
+    if not msg:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    msg.likes_count += 1
+    return {"message": "Liked cheer! 👏", "likes_count": msg.likes_count}
 
 
 # ─── Group Activities ─────────────────────────────────────────────────────────

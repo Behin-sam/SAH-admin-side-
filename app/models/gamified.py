@@ -368,6 +368,28 @@ class GroupActivityParticipant(Base):
     veteran = relationship("VeteranProfile")
 
 
+class GroupMessage(Base):
+    """Squad cheer board / peer encouragement messages."""
+    __tablename__ = "group_messages"
+    __table_args__ = (
+        Index("ix_group_message_time", "group_id", "created_at"),
+    )
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    group_id = Column(UUID(as_uuid=True), ForeignKey("veteran_groups.id"), nullable=False)
+    sender_id = Column(UUID(as_uuid=True), ForeignKey("veteran_profiles.id"), nullable=False)
+    sender_name = Column(String(100), default="Comrade")
+    sender_rank = Column(String(50), default="Soldier")
+    message = Column(Text, nullable=False)
+    cheer_type = Column(String(30), default="cheer")
+    likes_count = Column(Integer, default=0)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    # Relationships
+    group = relationship("VeteranGroup")
+    sender = relationship("VeteranProfile")
+
+
 # ─── Points & Rewards ─────────────────────────────────────────────────────────
 
 class PointsLedger(Base):

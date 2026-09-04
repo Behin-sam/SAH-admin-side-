@@ -51,6 +51,11 @@ interface AppContextType {
   acknowledgeInsight: (insightId: string) => void;
   addCounselorNote: (veteranId: string, text: string) => void;
   resetOnboarding: () => void;
+
+  // Groups / Squads & XP
+  joinedGroups: any[];
+  setJoinedGroups: React.Dispatch<React.SetStateAction<any[]>>;
+  awardXP: (amount: number, reason?: string) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -120,6 +125,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       notes: 'Feeling steady and aligned with morning routine.'
     }
   ]);
+
+  // Squads & Peer Groups State (cached per veteran)
+  const [joinedGroups, setJoinedGroups] = useState<any[]>(() => {
+    try {
+      const saved = localStorage.getItem(`sah_my_groups_${initialSession.vetId}`);
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return [];
+  });
+
+  // Load and sync joined groups for active veteran
+  useEffect(() => {
+    async function loadVeteranGroups() {
+      if (!activeVeteranId) return;
+      try {
+        const res = await apiService.getVeteranGroups(activeVeteranId);
+        if (res?.groups) {
+          setJoinedGroups(res.groups);
+          localStorage.setItem(`sah_my_groups_${activeVeteranId}`, JSON.stringify(res.groups));
+          return;
+        }
+      } catch (e) {}
+
+      try {
+        const saved = localStorage.getItem(`sah_my_groups_${activeVeteranId}`);
+        if (saved) setJoinedGroups(JSON.parse(saved));
+      } catch {}
+    }
+    loadVeteranGroups();
+  }, [activeVeteranId]);
 
   // Synchronize state with backend on startup
   useEffect(() => {
@@ -670,6 +705,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setActiveScreen('assessment');
   };
 
+  const awardXP = (amount: number, reason?: string) => {
+    setAllVeterans(prev =>
+      prev.map(v => {
+        if (v.user.id === activeVeteranId) {
+          const newXP = (v.profile.totalXP || 0) + amount;
+          return {
+            ...v,
+            profile: {
+              ...v.profile,
+              totalXP: newXP,
+              level: Math.floor(newXP / 300) + 1,
+            },
+          };
+        }
+        return v;
+      })
+    );
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -710,7 +764,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         assignCustomTask,
         acknowledgeInsight,
         addCounselorNote,
-        resetOnboarding
+        resetOnboarding,
+        joinedGroups,
+        setJoinedGroups,
+        awardXP,
       }}
     >
       {children}

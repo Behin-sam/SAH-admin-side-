@@ -11,7 +11,8 @@ export const HomeTodayJourney: React.FC = () => {
     setTaskToComplete,
     setIsCompletionModalOpen,
     setActiveScreen,
-    skipTask
+    skipTask,
+    joinedGroups
   } = useApp();
 
   const completedCount = tasks.filter(t => t.status === 'completed').length;
@@ -269,9 +270,18 @@ export const HomeTodayJourney: React.FC = () => {
               <span className="text-[#786F68]">Missions done</span>
               <span className="font-mono font-bold text-[#1C1917]">{completedCount} / {totalCount}</span>
             </div>
-            <div className="flex items-center justify-between py-1 border-b border-[#E8DCCE]/60">
-              <span className="text-[#786F68]">Groups joined</span>
-              <span className="font-mono font-bold text-[#1C1917]">2</span>
+            <div
+              onClick={() => setActiveScreen('groups')}
+              className="flex items-center justify-between py-1 border-b border-[#E8DCCE]/60 cursor-pointer hover:bg-[#F5EBE0]/50 px-1 -mx-1 rounded transition-colors group"
+              title="Click to view squads & peer groups"
+            >
+              <span className="text-[#786F68] group-hover:text-[#D96B27] flex items-center gap-1">
+                Groups joined
+                <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+              </span>
+              <span className="font-mono font-bold text-[#1C1917] group-hover:text-[#D96B27]">
+                {joinedGroups?.length ?? 0}
+              </span>
             </div>
             <div className="flex items-center justify-between py-1">
               <span className="text-[#786F68]">Walks verified</span>

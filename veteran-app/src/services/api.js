@@ -124,7 +124,7 @@ export const groupAPI = {
   },
 
   // Create group
-  createGroup: (data) => api.post('/groups', null, { params: data }),
+  createGroup: (data) => api.post('/groups', data),
 
   // Get group details
   getGroup: (groupId) => api.get(`/groups/${groupId}`),
@@ -163,6 +163,16 @@ export const groupAPI = {
     const res = await api.get(`/veterans/${veteranId}/groups`);
     return Array.isArray(res) ? res : (res?.groups || []);
   },
+
+  // Squad Cheer Board Messages
+  getMessages: async (groupId) => {
+    const res = await api.get(`/groups/${groupId}/messages`);
+    return res?.messages || (Array.isArray(res) ? res : []);
+  },
+
+  postMessage: (groupId, data) => api.post(`/groups/${groupId}/messages`, null, { params: data }),
+
+  likeMessage: (groupId, messageId) => api.post(`/groups/${groupId}/messages/${messageId}/like`),
 };
 
 // ─── Social Interaction Endpoints ─────────────────────────────────────────────
