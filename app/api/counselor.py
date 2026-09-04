@@ -24,12 +24,17 @@ from app.models import (
     CounselorCaseAssignment, SurvivorProfile,
     RiskTrajectoryLog, Alert, AlertStatus,
     CheckinResponse, ConsentState, ConsentStatus,
+    ReactionSignal,
 )
 from app.schemas.requests import CaseNoteUpdate, AlertAcknowledge
 from app.schemas.responses import (
     CounselorCaseSummary, AlertResponse, AlertListResponse,
-    TrajectoryInfo,
+    TrajectoryInfo, CounselorCaseReportResponse,
+    AnsweringPatternsResponse, TopicBreakdownResponse,
 )
+from app.engine.llm_summarizer import generate_counselor_report
+from app.engine.topic_sensitivity import compute_topic_sensitivity
+from app.engine.baseline import PersonalBaseline
 from app.security.access_control import verify_case_access
 
 router = APIRouter(prefix="/api/counselors/{counselor_id}", tags=["counselor"])
@@ -210,6 +215,116 @@ async def acknowledge_alert(
         case_notes=alert.case_notes,
         created_at=alert.created_at,
         acknowledged_at=alert.acknowledged_at,
+    )
+
+
+@router.get("/cases/{survivor_id}/report", response_model=CounselorCaseReportResponse)
+async def get_case_report(
+    counselor_id: UUID,
+    survivor_id: UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    """Get full counselor case report for a survivor.
+
+    This is the MAIN counselor dashboard view. Returns:
+    - Overall status and risk level
+    - Answering patterns (timing, skips, revisions)
+    - Topic-by-topic breakdown with activation levels
+    - Trend history
+    - Key behavioral patterns
+    - Protective factors
+    - Recommended focus areas
+    - Conversation starters
+
+    Uses LLM if configured (OpenAI/Anthropic), falls back to rule-based.
+    """
+    # Verify case assignment
+    assigned_ids = await _get_assigned_survivor_ids(db, counselor_id)
+    if str(survivor_id) not in assigned_ids:
+        raise HTTPException(status_code=403, detail="Not assigned to this survivor")
+
+    # Get trajectory analysis
+    trajectory_log = await _get_latest_trajectory(db, str(survivor_id))
+    if not trajectory_log:
+        raise HTTPException(status_code=404, detail="No trajectory data yet — baseline not established")
+
+    # Reconstruct TrendAnalysis from stored log
+    from app.engine.deviation import TrendAnalysis
+    analysis = TrendAnalysis(
+        distress_values=trajectory_log.z_scores.get("distress_window", [trajectory_log.severity_score]) if trajectory_log.z_scores else [trajectory_log.severity_score],
+        mean_distress=trajectory_log.severity_score,
+        slope=trajectory_log.z_scores.get("slope", 0.0) if trajectory_log.z_scores else 0.0,
+        max_distress=max(trajectory_log.z_scores.get("distress_window", [trajectory_log.severity_score])) if trajectory_log.z_scores else trajectory_log.severity_score,
+        elevated_count=trajectory_log.z_scores.get("elevated_count", 0) if trajectory_log.z_scores else 0,
+        trajectory_label=trajectory_log.trajectory_label.value,
+        severity_score=trajectory_log.severity_score,
+        confidence=trajectory_log.confidence,
+        contributing_features=trajectory_log.contributing_features or [],
+        contributing_topics=trajectory_log.contributing_topics or [],
+    )
+
+    # Get topic sensitivities from recent signals
+    result = await db.execute(
+        select(ReactionSignal)
+        .where(ReactionSignal.survivor_id == str(survivor_id))
+        .order_by(ReactionSignal.recorded_at.desc())
+        .limit(50)
+    )
+    signals = result.scalars().all()
+
+    # Group signals by topic (simplified — in production, join with question bank)
+    topic_signal_data: dict[str, list[dict]] = {}
+    for sig in signals:
+        topic_data = {"time_to_answer": sig.time_to_answer}
+        # Default topic if no question-topic mapping available
+        topic_signal_data.setdefault("general", []).append(topic_data)
+
+    topic_sensitivities = compute_topic_sensitivity(
+        PersonalBaseline(survivor_id=str(survivor_id)),
+        topic_signal_data,
+    ) if topic_signal_data else None
+
+    # Build baseline summary for the report
+    baseline_summary = {}
+    if trajectory_log.z_scores:
+        for metric, value in trajectory_log.z_scores.items():
+            if isinstance(value, dict):
+                baseline_summary[metric] = value
+
+    # Generate the full report
+    report = await generate_counselor_report(
+        analysis=analysis,
+        topic_sensitivities=topic_sensitivities,
+        baseline_summary=baseline_summary or None,
+    )
+
+    return CounselorCaseReportResponse(
+        survivor_id=survivor_id,
+        overall_status=report.overall_status,
+        risk_level_plain_language=report.risk_level_plain_language,
+        answering_patterns=AnsweringPatternsResponse(
+            response_timing=report.answering_patterns.response_timing,
+            skip_behavior=report.answering_patterns.skip_behavior,
+            revision_behavior=report.answering_patterns.revision_behavior,
+            engagement_level=report.answering_patterns.engagement_level,
+        ),
+        topic_breakdown=[
+            TopicBreakdownResponse(
+                topic=tb.topic,
+                status=tb.status,
+                detail=tb.detail,
+                trend=tb.trend,
+                counselor_note=tb.counselor_note,
+            )
+            for tb in report.topic_breakdown
+        ],
+        trend_history=report.trend_history,
+        key_patterns=report.key_patterns,
+        protective_factors=report.protective_factors,
+        recommended_focus_areas=report.recommended_focus_areas,
+        conversation_starters=report.conversation_starters,
+        important_context=report.important_context,
+        provider=report.provider,
     )
 
 

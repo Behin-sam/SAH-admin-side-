@@ -30,6 +30,13 @@ class Settings(BaseSettings):
     # Severity: how many points in the window must exceed threshold
     SEVERITY_MIN_POINTS: int = 3
 
+    # LLM provider (for counselor summaries)
+    # Set one of these to enable LLM-powered summaries.
+    # If neither is set, rule-based summaries are used as fallback.
+    OPENAI_API_KEY: str = ""
+    ANTHROPIC_API_KEY: str = ""
+    LLM_MODEL: str = ""  # e.g. "gpt-4o" or "claude-3-5-sonnet-20241022"
+
     class Config:
         env_file = ".env"
         extra = "ignore"

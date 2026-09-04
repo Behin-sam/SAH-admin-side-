@@ -34,6 +34,7 @@ from typing import Optional
 
 from app.engine.deviation import TrendAnalysis, generate_trend_summary
 from app.engine.topic_sensitivity import TopicActivation
+from app.engine.llm_summarizer import generate_counselor_report
 
 
 # ─── Alert Types ──────────────────────────────────────────────────────────────
@@ -73,30 +74,37 @@ def determine_action(trajectory_label: str, severity_score: float) -> str:
 
 # ─── Alert Payload Builder ────────────────────────────────────────────────────
 
-def build_alert_payload(
+async def build_alert_payload(
     survivor_id: str,
     counselor_id: str,
     analysis: TrendAnalysis,
     topic_sensitivities: dict[str, TopicActivation] | None = None,
+    baseline_summary: dict | None = None,
 ) -> dict:
-    """Build a rich alert payload with trend summary + explainability.
+    """Build a rich alert payload with LLM-generated case report.
 
-    This is what the counselor sees. It should answer:
-    1. WHAT is happening? (trajectory label + severity)
-    2. WHY do we think this? (contributing features + topics)
-    3. HOW confident are we? (confidence score)
-    4. WHAT should I do? (action type + recommended response)
-
-    The payload is intentionally human-readable — counselors are not
-    data scientists.
+    This is what the counselor sees. It uses the LLM summarizer
+    to generate a full case report with answering patterns,
+    topic breakdown, and conversation starters.
     """
     action = determine_action(analysis.trajectory_label, analysis.severity_score)
+    urgency = _determine_urgency(analysis)
 
-    # Build topic contributions
+    # Generate full case report via LLM (or rule-based fallback)
+    report = await generate_counselor_report(
+        analysis=analysis,
+        topic_sensitivities=topic_sensitivities,
+        baseline_summary=baseline_summary,
+    )
+
+    # Also generate a concise trend summary for the alert header
+    trend_summary = generate_trend_summary(analysis)
+
+    # Build topic contributions for the alert
     topic_contributions = []
     if topic_sensitivities:
         for topic, ta in topic_sensitivities.items():
-            if ta.activation_score > 0.4:  # Only include notable topics
+            if ta.activation_score > 0.4:
                 topic_contributions.append({
                     "topic": topic,
                     "activation_score": ta.activation_score,
@@ -104,7 +112,7 @@ def build_alert_payload(
                 })
         topic_contributions.sort(key=lambda x: x["activation_score"], reverse=True)
 
-    # Top contributing features
+    # Feature details
     feature_contributions = []
     for fc in analysis.contributing_features[:5]:
         feature_contributions.append({
@@ -112,12 +120,6 @@ def build_alert_payload(
             "z_score": fc["z_score"],
             "interpretation": _interpret_metric(fc["metric"], fc["z_score"]),
         })
-
-    # Build trend summary
-    trend_summary = generate_trend_summary(analysis)
-
-    # Determine urgency level
-    urgency = _determine_urgency(analysis)
 
     return {
         "survivor_id": survivor_id,
@@ -133,6 +135,25 @@ def build_alert_payload(
         "topic_details": topic_contributions,
         "feature_details": feature_contributions,
         "recommended_response": _recommend_response(action, analysis),
+        # LLM-powered case report fields
+        "overall_status": report.overall_status,
+        "risk_level_plain_language": report.risk_level_plain_language,
+        "answering_patterns": {
+            "response_timing": report.answering_patterns.response_timing,
+            "skip_behavior": report.answering_patterns.skip_behavior,
+            "revision_behavior": report.answering_patterns.revision_behavior,
+            "engagement_level": report.answering_patterns.engagement_level,
+        },
+        "topic_breakdown": [
+            {"topic": tb.topic, "status": tb.status, "detail": tb.detail,
+             "trend": tb.trend, "counselor_note": tb.counselor_note}
+            for tb in report.topic_breakdown
+        ],
+        "key_patterns": report.key_patterns,
+        "protective_factors": report.protective_factors,
+        "conversation_starters": report.conversation_starters,
+        "important_context": report.important_context,
+        "report_provider": report.provider,
     }
 
 

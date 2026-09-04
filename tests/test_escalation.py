@@ -51,7 +51,7 @@ class TestDetermineAction:
 
 
 class TestBuildAlertPayload:
-    """Test alert payload construction."""
+    """Test alert payload construction (now async)."""
 
     def _make_analysis(self, label="escalating", severity=0.65, slope=0.1):
         return TrendAnalysis(
@@ -70,9 +70,10 @@ class TestBuildAlertPayload:
             contributing_topics=["sleep", "safety"],
         )
 
-    def test_payload_has_required_fields(self):
+    @pytest.mark.asyncio
+    async def test_payload_has_required_fields(self):
         analysis = self._make_analysis()
-        payload = build_alert_payload("s1", "c1", analysis)
+        payload = await build_alert_payload("s1", "c1", analysis)
 
         assert payload["survivor_id"] == "s1"
         assert payload["counselor_id"] == "c1"
@@ -83,61 +84,73 @@ class TestBuildAlertPayload:
         assert "contributing_topics" in payload
         assert "feature_details" in payload
         assert "recommended_response" in payload
+        # LLM report fields
+        assert "overall_status" in payload
+        assert "answering_patterns" in payload
+        assert "topic_breakdown" in payload
+        assert "key_patterns" in payload
 
-    def test_payload_includes_feature_interpretations(self):
+    @pytest.mark.asyncio
+    async def test_payload_includes_feature_interpretations(self):
         analysis = self._make_analysis()
-        payload = build_alert_payload("s1", "c1", analysis)
+        payload = await build_alert_payload("s1", "c1", analysis)
 
         features = payload["feature_details"]
         assert len(features) > 0
         assert features[0]["metric"] == "time_to_answer"
         assert "interpretation" in features[0]
 
-    def test_payload_with_topic_sensitivities(self):
+    @pytest.mark.asyncio
+    async def test_payload_with_topic_sensitivities(self):
         analysis = self._make_analysis()
         topics = {
             "sleep": TopicActivation("sleep", 0.82, 10, 2.1, True),
             "safety": TopicActivation("safety", 0.71, 10, 1.8, True),
             "food": TopicActivation("food", 0.25, 10, 0.5, False),
         }
-        payload = build_alert_payload("s1", "c1", analysis, topics)
+        payload = await build_alert_payload("s1", "c1", analysis, topics)
 
-        # Only elevated topics should be included
         topic_details = payload["topic_details"]
         topic_names = [t["topic"] for t in topic_details]
         assert "sleep" in topic_names
         assert "safety" in topic_names
-        assert "food" not in topic_names  # Below threshold
+        assert "food" not in topic_names
 
-    def test_acute_payload_urgency(self):
+    @pytest.mark.asyncio
+    async def test_acute_payload_urgency(self):
         analysis = self._make_analysis(label="acute", severity=0.85)
-        payload = build_alert_payload("s1", "c1", analysis)
+        payload = await build_alert_payload("s1", "c1", analysis)
         assert payload["urgency"] == "critical"
 
-    def test_escalating_high_severity_urgency(self):
+    @pytest.mark.asyncio
+    async def test_escalating_high_severity_urgency(self):
         analysis = self._make_analysis(label="escalating", severity=0.75)
-        payload = build_alert_payload("s1", "c1", analysis)
+        payload = await build_alert_payload("s1", "c1", analysis)
         assert payload["urgency"] == "high"
 
-    def test_escalating_medium_severity_urgency(self):
+    @pytest.mark.asyncio
+    async def test_escalating_medium_severity_urgency(self):
         analysis = self._make_analysis(label="escalating", severity=0.5)
-        payload = build_alert_payload("s1", "c1", analysis)
+        payload = await build_alert_payload("s1", "c1", analysis)
         assert payload["urgency"] == "medium"
 
-    def test_recommended_response_for_immediate(self):
+    @pytest.mark.asyncio
+    async def test_recommended_response_for_immediate(self):
         analysis = self._make_analysis(label="acute", severity=0.9)
-        payload = build_alert_payload("s1", "c1", analysis)
+        payload = await build_alert_payload("s1", "c1", analysis)
         assert "IMMEDIATE" in payload["recommended_response"]
         assert "1 hour" in payload["recommended_response"]
 
-    def test_recommended_response_for_alert(self):
+    @pytest.mark.asyncio
+    async def test_recommended_response_for_alert(self):
         analysis = self._make_analysis(label="escalating", severity=0.6)
-        payload = build_alert_payload("s1", "c1", analysis)
+        payload = await build_alert_payload("s1", "c1", analysis)
         assert "24 hours" in payload["recommended_response"]
 
-    def test_recommended_response_for_self_resource(self):
+    @pytest.mark.asyncio
+    async def test_recommended_response_for_self_resource(self):
         analysis = self._make_analysis(label="declining", severity=0.3)
-        payload = build_alert_payload("s1", "c1", analysis)
+        payload = await build_alert_payload("s1", "c1", analysis)
         assert "encouraging" in payload["recommended_response"].lower()
 
 

@@ -7,7 +7,7 @@ before being returned, so counselors never see raw response text.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional
 from uuid import UUID
 
@@ -136,6 +136,54 @@ class AlertListResponse(BaseModel):
     """List of alerts for a counselor."""
     alerts: list[AlertResponse]
     total_pending: int
+
+
+# ─── Counselor Case Report (LLM-powered) ────────────────────────────────────
+
+class AnsweringPatternsResponse(BaseModel):
+    """How the survivor answers questions — timing, skips, revisions."""
+    response_timing: str = Field("", description="How their answer speed has changed")
+    skip_behavior: str = Field("", description="Which topics they skip and how often")
+    revision_behavior: str = Field("", description="How often they change answers")
+    engagement_level: str = Field("", description="Overall engagement with check-ins")
+
+
+class TopicBreakdownResponse(BaseModel):
+    """Detailed breakdown for a single topic."""
+    topic: str
+    status: str = Field(..., description="stable / elevated / strongly_elevated / improving")
+    detail: str = Field("", description="How this topic compares to their baseline")
+    trend: str = Field("stable", description="improving / worsening / stable")
+    counselor_note: str = Field("", description="What to be aware of for this topic")
+
+
+class CounselorCaseReportResponse(BaseModel):
+    """Full counselor case report — the complete dashboard view."""
+    survivor_id: UUID
+
+    # Overall
+    overall_status: str = Field("", description="Concise overall assessment")
+    risk_level_plain_language: str = Field("unknown", description="low / moderate / elevated / high / critical")
+
+    # Answering patterns
+    answering_patterns: AnsweringPatternsResponse = Field(default_factory=AnsweringPatternsResponse)
+
+    # Topic-by-topic
+    topic_breakdown: list[TopicBreakdownResponse] = Field(default_factory=list)
+
+    # Trend
+    trend_history: str = Field("", description="How patterns changed over time")
+
+    # Key insights
+    key_patterns: list[str] = Field(default_factory=list, description="Most notable behavioral patterns")
+    protective_factors: list[str] = Field(default_factory=list, description="Positive or stable patterns")
+    recommended_focus_areas: list[str] = Field(default_factory=list, description="What to explore in conversation")
+    conversation_starters: list[str] = Field(default_factory=list, description="Trauma-informed opening questions")
+    important_context: str = Field("", description="Additional context for the counselor")
+
+    # Metadata
+    provider: str = Field("rule_based", description="Which provider generated this report")
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 # ─── Sync ─────────────────────────────────────────────────────────────────────
