@@ -20,8 +20,10 @@ import GroupDetailScreen from './src/screens/GroupDetailScreen';
 import PointsScreen from './src/screens/PointsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import AdminScreen from './src/screens/AdminScreen';
+import ChatScreen from './src/screens/ChatScreen';
 
 import { storage } from './src/services/storage';
+import { notificationService } from './src/services/notifications';
 
 const AuthContext = createContext(null);
 export const useAuth = () => useContext(AuthContext);
@@ -74,6 +76,7 @@ function MainStack() {
       <Stack.Screen name="TaskDetail" component={TaskDetailScreen} options={{ title: 'Task Details', headerStyle: { backgroundColor: '#1e3a5f' }, headerTintColor: '#fff' }} />
       <Stack.Screen name="GPSTracking" component={GPSTrackingScreen} options={{ title: 'GPS Tracking', headerStyle: { backgroundColor: '#1e3a5f' }, headerTintColor: '#fff' }} />
       <Stack.Screen name="GroupDetail" component={GroupDetailScreen} options={{ title: 'Group Details', headerStyle: { backgroundColor: '#1e3a5f' }, headerTintColor: '#fff' }} />
+      <Stack.Screen name="Chat" component={ChatScreen} options={{ title: 'Counselor Chat', headerStyle: { backgroundColor: '#1e3a5f' }, headerTintColor: '#fff' }} />
       <Stack.Screen name="Admin" component={AdminScreen} options={{ title: 'Admin Dashboard', headerStyle: { backgroundColor: '#7c3aed' }, headerTintColor: '#fff' }} />
     </Stack.Navigator>
   );
@@ -83,7 +86,17 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => { checkAuth(); }, []);
+  useEffect(() => {
+    checkAuth();
+    setupNotifications();
+  }, []);
+
+  const setupNotifications = async () => {
+    const granted = await notificationService.requestPermission();
+    if (granted) {
+      await notificationService.scheduleDailyReminder(9, 0);
+    }
+  };
 
   const checkAuth = async () => {
     try {

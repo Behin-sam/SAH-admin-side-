@@ -34,6 +34,13 @@ const ProfileScreen = ({ navigation }) => {
 
   const menuItems = [
     {
+      icon: 'chatbubbles',
+      title: 'Counselor Chat',
+      subtitle: 'Message your therapist or counselor',
+      onPress: () => navigation.navigate('Chat', { counselorName: 'Dr. Sarah Mitchell' }),
+      color: '#2563eb',
+    },
+    {
       icon: 'person',
       title: 'Edit Profile',
       subtitle: 'Update your information',

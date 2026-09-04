@@ -5,7 +5,9 @@
 
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:8000/api';
+const API_BASE_URL = 'http://10.0.2.2:8000/api'; // Android emulator
+// For iOS simulator use: http://localhost:8000/api
+// For physical device use: http://<YOUR_IP>:8000/api
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -187,6 +189,38 @@ export const adminAPI = {
 
   // Export data
   exportData: (format = 'json', days = 30) => api.get('/admin/reports/export', { params: { format, days } }),
+};
+
+// ─── Chat Endpoints ─────────────────────────────────────────────────────────
+
+export const chatAPI = {
+  // List counselors
+  listCounselors: () => api.get('/veterans/' + 'demo-veteran-001' + '/chat/counselors'),
+
+  // List conversations
+  listConversations: (veteranId) => api.get(`/veterans/${veteranId}/chat/conversations`),
+
+  // Start conversation
+  startConversation: (veteranId, counselorId, subject, message) =>
+    api.post(`/veterans/${veteranId}/chat/conversations`, null, {
+      params: { counselor_id: counselorId, subject, initial_message: message }
+    }),
+
+  // Get conversation with messages
+  getConversation: (veteranId, conversationId) =>
+    api.get(`/veterans/${veteranId}/chat/conversations/${conversationId}`),
+
+  // Send message
+  sendMessage: (veteranId, conversationId, content) =>
+    api.post(`/veterans/${veteranId}/chat/conversations/${conversationId}/messages`, null, {
+      params: { content }
+    }),
+
+  // Send emergency message
+  sendEmergency: (veteranId, content) =>
+    api.post(`/veterans/${veteranId}/chat/emergency`, null, {
+      params: { content }
+    }),
 };
 
 export default api;

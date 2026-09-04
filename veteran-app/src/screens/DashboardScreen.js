@@ -219,6 +219,13 @@ const DashboardScreen = ({ navigation }) => {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.actionButton}
+            onPress={() => navigation.navigate('Chat', { counselorName: 'Dr. Sarah Mitchell' })}
+          >
+            <Ionicons name="chatbubbles" size={32} color="#10b981" />
+            <Text style={styles.actionText}>Chat</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.actionButton}
             onPress={() => navigation.navigate('Points')}
           >
             <Ionicons name="gift" size={32} color="#f59e0b" />

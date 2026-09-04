@@ -8,7 +8,7 @@ OpenAPI docs at: http://localhost:8000/docs
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import survivors, consent, checkins, counselor, sync, veterans, tasks, gps, groups, admin
+from app.api import survivors, consent, checkins, counselor, sync, veterans, tasks, gps, groups, admin, chat
 from app.database import engine, Base
 
 app = FastAPI(
@@ -23,10 +23,18 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-# CORS — allow frontend dev server
+# CORS — allow frontend dev server + mobile app
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:5173"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://localhost:8099",
+        "http://localhost:19006",
+        "http://127.0.0.1:8099",
+        "http://127.0.0.1:19006",
+        "*",  # Allow all for mobile/Expo
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -45,6 +53,7 @@ app.include_router(tasks.router)
 app.include_router(gps.router)
 app.include_router(groups.router)
 app.include_router(admin.router)
+app.include_router(chat.router)
 
 
 @app.on_event("startup")
