@@ -294,7 +294,7 @@ async def seed_question_bank():
             )
             db.add(question)
             questions_added += 1
-            print(f"  [INTAKE {i+1:2d}] {q['text'][:60]}... → {q['topic_tags']}")
+            print(f"  [INTAKE {i+1:2d}] {q['text'][:60]}... -> {q['topic_tags']}")
 
         # Add check-in questions
         for i, q in enumerate(CHECKIN_QUESTIONS):
@@ -308,10 +308,10 @@ async def seed_question_bank():
             )
             db.add(question)
             questions_added += 1
-            print(f"  [CHECKIN {i+1:2d}] {q['text'][:60]}... → {q['topic_tags']}")
+            print(f"  [CHECKIN {i+1:2d}] {q['text'][:60]}... -> {q['topic_tags']}")
 
         await db.commit()
-        print(f"\n✅ Seeded {questions_added} questions ({len(INTAKE_QUESTIONS)} intake + {len(CHECKIN_QUESTIONS)} check-in)")
+        print(f"\nSeeded {questions_added} questions ({len(INTAKE_QUESTIONS)} intake + {len(CHECKIN_QUESTIONS)} check-in)")
 
 
 if __name__ == "__main__":

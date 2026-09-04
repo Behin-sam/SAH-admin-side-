@@ -15,6 +15,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../App';
+import { theme } from '../constants/theme';
+import { veteranAPI } from '../services/api';
 
 const DashboardScreen = ({ navigation }) => {
   const { user } = useAuth();
@@ -24,10 +26,23 @@ const DashboardScreen = ({ navigation }) => {
 
   useEffect(() => {
     loadDashboard();
-  }, []);
+  }, [user]);
 
   const loadDashboard = async () => {
     try {
+      if (user?.id) {
+        try {
+          const liveData = await veteranAPI.getDashboard(user.id);
+          if (liveData && liveData.stats) {
+            setDashboardData(liveData);
+            setLoading(false);
+            setRefreshing(false);
+            return;
+          }
+        } catch (apiErr) {
+          console.warn('Live dashboard fetch failed, falling back to mock:', apiErr.message);
+        }
+      }
       // Mock data for demo
       const mockData = {
         greeting: getGreeting(),
@@ -276,16 +291,17 @@ const DashboardScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: theme.colors.cream[200],
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: theme.colors.cream[200],
   },
   greetingContainer: {
-    padding: 20,
-    backgroundColor: '#1e3a5f',
+    padding: 22,
+    backgroundColor: theme.colors.espresso[900],
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
   },
@@ -297,7 +313,7 @@ const styles = StyleSheet.create({
   },
   date: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: theme.colors.peach[200],
   },
   statsContainer: {
     flexDirection: 'row',
@@ -307,27 +323,26 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.cream[50],
     borderRadius: 16,
+    borderWidth: 1,
+    borderColor: theme.colors.cream[400],
     padding: 16,
     alignItems: 'center',
     marginHorizontal: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    ...theme.shadows.warm,
   },
   statValue: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#1f2937',
+    color: theme.colors.espresso[900],
     marginTop: 8,
   },
   statLabel: {
     fontSize: 12,
-    color: '#6b7280',
+    color: theme.colors.espresso[400],
     marginTop: 4,
+    fontWeight: '600',
   },
   section: {
     padding: 16,
@@ -344,30 +359,29 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#1f2937',
+    color: theme.colors.espresso[900],
   },
   seeAll: {
     fontSize: 14,
-    color: '#2563eb',
+    color: theme.colors.rust[500],
+    fontWeight: '700',
   },
   taskCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: theme.colors.cream[50],
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: theme.colors.cream[400],
     padding: 16,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
+    ...theme.shadows.warm,
   },
   taskIcon: {
     width: 48,
     height: 48,
     borderRadius: 12,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: theme.colors.peach[200],
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -377,13 +391,13 @@ const styles = StyleSheet.create({
   },
   taskTitle: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#1f2937',
+    fontWeight: '700',
+    color: theme.colors.espresso[900],
     marginBottom: 4,
   },
   taskDescription: {
     fontSize: 13,
-    color: '#6b7280',
+    color: theme.colors.espresso[400],
     marginBottom: 6,
   },
   taskMeta: {
@@ -392,23 +406,24 @@ const styles = StyleSheet.create({
   },
   taskPoints: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#f59e0b',
+    fontWeight: '700',
+    color: theme.colors.rust[500],
     marginRight: 10,
   },
   gpsBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#eff6ff',
+    backgroundColor: theme.colors.peach[200],
     paddingHorizontal: 8,
     paddingVertical: 2,
-    borderRadius: 10,
+    borderRadius: 6,
   },
   gpsBadgeText: {
     fontSize: 10,
-    color: '#2563eb',
+    color: theme.colors.peach[800],
     marginLeft: 4,
-    fontWeight: '500',
+    fontWeight: '700',
+    textTransform: 'uppercase',
   },
   taskStatus: {
     marginLeft: 12,
@@ -423,27 +438,26 @@ const styles = StyleSheet.create({
   },
   actionText: {
     fontSize: 12,
-    color: '#374151',
+    color: theme.colors.espresso[900],
     marginTop: 8,
+    fontWeight: '600',
   },
   groupCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: theme.colors.cream[50],
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: theme.colors.cream[400],
     padding: 16,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
+    ...theme.shadows.warm,
   },
   groupIcon: {
     width: 48,
     height: 48,
     borderRadius: 12,
-    backgroundColor: '#f3e8ff',
+    backgroundColor: theme.colors.peach[200],
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -453,13 +467,13 @@ const styles = StyleSheet.create({
   },
   groupName: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#1f2937',
+    fontWeight: '700',
+    color: theme.colors.espresso[900],
     marginBottom: 4,
   },
   groupMeta: {
     fontSize: 13,
-    color: '#6b7280',
+    color: theme.colors.espresso[400],
   },
 });
 

@@ -4,10 +4,14 @@
  */
 
 import axios from 'axios';
+import { Platform } from 'react-native';
 
-const API_BASE_URL = 'http://10.0.2.2:8000/api'; // Android emulator
-// For iOS simulator use: http://localhost:8000/api
-// For physical device use: http://<YOUR_IP>:8000/api
+const API_BASE_URL = Platform.select({
+  web: 'http://localhost:8000/api',
+  ios: 'http://localhost:8000/api',
+  android: 'http://10.0.2.2:8000/api',
+  default: 'http://localhost:8000/api',
+});
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -48,9 +52,7 @@ export const veteranAPI = {
   getStats: (id) => api.get(`/veterans/${id}/stats`),
 
   // Submit wellness assessment
-  submitAssessment: (id, answers) => api.post(`/veterans/${id}/assessment`, null, {
-    params: { answers: JSON.stringify(answers) }
-  }),
+  submitAssessment: (id, answers) => api.post(`/veterans/${id}/assessment`, answers),
 
   // Get dashboard
   getDashboard: (id) => api.get(`/veterans/${id}/dashboard`),
@@ -221,6 +223,12 @@ export const chatAPI = {
     api.post(`/veterans/${veteranId}/chat/emergency`, null, {
       params: { content }
     }),
+};
+
+export const authAPI = {
+  login: (email, password, role = 'veteran') => api.post('/auth/login', { email, password, role }),
+  register: (data) => api.post('/auth/register', data),
+  getDemoUsers: () => api.get('/auth/demo-users'),
 };
 
 export default api;

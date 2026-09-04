@@ -17,6 +17,7 @@ import {
   Image,
 } from 'react-native';
 import { useAuth } from '../../App';
+import { theme } from '../constants/theme';
 
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
@@ -135,7 +136,7 @@ const LoginScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1e3a5f',
+    backgroundColor: theme.colors.cream[200],
   },
   keyboardView: {
     flex: 1,
@@ -156,12 +157,13 @@ const styles = StyleSheet.create({
   logoText: {
     fontSize: 48,
     fontWeight: 'bold',
-    color: '#fff',
+    color: theme.colors.espresso[900],
     letterSpacing: 2,
   },
   tagline: {
     fontSize: 16,
-    color: '#94a3b8',
+    color: theme.colors.rust[500],
+    fontWeight: '700',
     marginTop: 5,
   },
   welcomeContainer: {
@@ -171,12 +173,12 @@ const styles = StyleSheet.create({
   welcomeTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#fff',
+    color: theme.colors.espresso[900],
     marginBottom: 8,
   },
   welcomeSubtitle: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: theme.colors.espresso[400],
     textAlign: 'center',
   },
   formContainer: {
@@ -187,23 +189,26 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     fontSize: 14,
-    color: '#e2e8f0',
+    color: theme.colors.espresso[900],
     marginBottom: 8,
-    fontWeight: '500',
+    fontWeight: '700',
   },
   input: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.cream[50],
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: theme.colors.cream[400],
     padding: 16,
     fontSize: 16,
-    color: '#1f2937',
+    color: theme.colors.espresso[900],
   },
   button: {
-    backgroundColor: '#2563eb',
+    backgroundColor: theme.colors.rust[500],
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
     marginTop: 10,
+    ...theme.shadows.rustGlow,
   },
   buttonDisabled: {
     opacity: 0.7,
@@ -218,20 +223,21 @@ const styles = StyleSheet.create({
     marginTop: 15,
   },
   forgotPasswordText: {
-    color: '#60a5fa',
+    color: theme.colors.rust[500],
     fontSize: 14,
+    fontWeight: '600',
   },
   quickAccessContainer: {
     marginBottom: 30,
   },
   quickAccessTitle: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: theme.colors.espresso[400],
     textAlign: 'center',
     marginBottom: 10,
   },
   adminButton: {
-    backgroundColor: '#374151',
+    backgroundColor: theme.colors.espresso[900],
     borderRadius: 12,
     padding: 14,
     alignItems: 'center',
@@ -239,12 +245,13 @@ const styles = StyleSheet.create({
   adminButtonText: {
     color: '#e5e7eb',
     fontSize: 14,
+    fontWeight: '600',
   },
   footer: {
     alignItems: 'center',
   },
   footerText: {
-    color: '#64748b',
+    color: theme.colors.espresso[400],
     fontSize: 12,
     marginBottom: 5,
   },

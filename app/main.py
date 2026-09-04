@@ -8,8 +8,9 @@ OpenAPI docs at: http://localhost:8000/docs
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import survivors, consent, checkins, counselor, sync, veterans, tasks, gps, groups, admin, chat
+from app.api import survivors, consent, checkins, counselor, sync, veterans, tasks, gps, groups, admin, chat, auth
 from app.database import engine, Base
+from seed_demo_data import seed
 
 app = FastAPI(
     title="SAH — Trauma-Informed Support System",
@@ -41,6 +42,7 @@ app.add_middleware(
 )
 
 # Register routers
+app.include_router(auth.router)
 app.include_router(survivors.router)
 app.include_router(consent.router)
 app.include_router(checkins.router)
@@ -58,9 +60,13 @@ app.include_router(chat.router)
 
 @app.on_event("startup")
 async def startup():
-    """Create tables on startup (dev only — use Alembic in production)."""
+    """Create tables on startup and seed initial demo data."""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    try:
+        await seed()
+    except Exception as e:
+        print(f"Startup seed notice: {e}")
 
 
 @app.get("/")

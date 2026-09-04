@@ -22,6 +22,7 @@ from app.models.gamified import (
     VeteranProfile,
     DailyTask,
     PointsLedger,
+    VeteranGroup,
     GroupMembership,
     SocialInteraction,
     GPSTrack,

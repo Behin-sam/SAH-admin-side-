@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRY_MINUTES: int = 60
 
+    # Optional LLM API keys (falls back to rule-based summarization when None)
+    OPENAI_API_KEY: str | None = None
+    ANTHROPIC_API_KEY: str | None = None
+
     # Baseline period
     BASELINE_PERIOD_DAYS: int = 14
 

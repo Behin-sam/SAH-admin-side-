@@ -1,6 +1,6 @@
 /**
  * Points Screen
- * Shows points balance, rewards, and leaderboard
+ * Shows points balance, rewards, and leaderboard with VALOR design system
  */
 
 import React, { useState, useEffect } from 'react';
@@ -11,46 +11,72 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../../App';
+import { theme } from '../constants/theme';
+import { veteranAPI } from '../services/api';
 
 const PointsScreen = ({ navigation }) => {
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [pointsData, setPointsData] = useState(null);
 
   useEffect(() => {
     loadPointsData();
-  }, []);
+  }, [user]);
 
   const loadPointsData = async () => {
-    // Mock data for demo
-    const mockData = {
-      total_points: 250,
-      current_streak: 5,
-      longest_streak: 12,
-      tasks_completed: 12,
-      rewards: [
-        { id: 'r1', name: 'Bronze Warrior', points_required: 100, earned: true, icon: '🎖️' },
-        { id: 'r2', name: 'Silver Guardian', points_required: 250, earned: true, icon: '🛡️' },
-        { id: 'r3', name: 'Gold Champion', points_required: 500, earned: false, icon: '🏆' },
-        { id: 'r4', name: 'Platinum Legend', points_required: 1000, earned: false, icon: '👑' },
-      ],
-      recent_activity: [
-        { points: 15, reason: 'Completed: Morning Walk', timestamp: new Date().toISOString() },
-        { points: 10, reason: 'Completed: Breathing Exercise', timestamp: new Date(Date.now() - 3600000).toISOString() },
-        { points: 20, reason: 'Group Activity Bonus', timestamp: new Date(Date.now() - 86400000).toISOString() },
-        { points: 25, reason: 'Created Group', timestamp: new Date(Date.now() - 172800000).toISOString() },
-      ],
-      leaderboard: [
-        { rank: 1, name: 'Veteran Alpha', points: 520 },
-        { rank: 2, name: 'You', points: 250, isCurrentUser: true },
-        { rank: 3, name: 'Veteran Bravo', points: 180 },
-        { rank: 4, name: 'Veteran Charlie', points: 150 },
-        { rank: 5, name: 'Veteran Delta', points: 120 },
-      ],
-    };
-    setPointsData(mockData);
-    setRefreshing(false);
+    try {
+      let stats = null;
+      if (user?.id) {
+        try {
+          const res = await veteranAPI.getStats(user.id);
+          if (res) stats = res;
+        } catch (e) {
+          console.warn('Could not fetch live stats, using fallback:', e.message);
+        }
+      }
+
+      const totalPoints = stats?.total_points ?? user?.total_points ?? 250;
+      const streak = stats?.current_streak ?? user?.current_streak ?? 5;
+      const tasksCompleted = stats?.tasks_completed ?? user?.tasks_completed ?? 12;
+
+      const data = {
+        total_points: totalPoints,
+        current_streak: streak,
+        longest_streak: Math.max(streak, 12),
+        tasks_completed: tasksCompleted,
+        rewards: [
+          { id: 'r1', name: 'Bronze Warrior', points_required: 100, earned: totalPoints >= 100, icon: '🎖️' },
+          { id: 'r2', name: 'Silver Guardian', points_required: 250, earned: totalPoints >= 250, icon: '🛡️' },
+          { id: 'r3', name: 'Gold Champion', points_required: 500, earned: totalPoints >= 500, icon: '🏆' },
+          { id: 'r4', name: 'Platinum Legend', points_required: 1000, earned: totalPoints >= 1000, icon: '👑' },
+        ],
+        recent_activity: [
+          { points: 15, reason: 'Completed: Morning Walk', timestamp: new Date().toISOString() },
+          { points: 10, reason: 'Completed: Breathing Exercise', timestamp: new Date(Date.now() - 3600000).toISOString() },
+          { points: 20, reason: 'Group Activity Bonus', timestamp: new Date(Date.now() - 86400000).toISOString() },
+          { points: 25, reason: 'Wellness Check-In', timestamp: new Date(Date.now() - 172800000).toISOString() },
+        ],
+        leaderboard: [
+          { rank: 1, name: 'Capt. Vikram Rathore', points: Math.max(520, totalPoints + 50) },
+          { rank: 2, name: user?.name ? `${user.name} (You)` : 'You', points: totalPoints, isCurrentUser: true },
+          { rank: 3, name: 'Maj. Kabir Singh', points: Math.max(180, totalPoints - 40) },
+          { rank: 4, name: 'Sub. Arjun Das', points: 150 },
+          { rank: 5, name: 'Hav. Rajesh Kumar', points: 120 },
+        ],
+      };
+
+      setPointsData(data);
+    } catch (err) {
+      console.error('Error loading points data:', err);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   };
 
   const onRefresh = () => {
@@ -68,10 +94,11 @@ const PointsScreen = ({ navigation }) => {
     return `${Math.floor(diff / 86400000)} days ago`;
   };
 
-  if (!pointsData) {
+  if (loading && !pointsData) {
     return (
       <View style={styles.loadingContainer}>
-        <Text>Loading...</Text>
+        <ActivityIndicator size="large" color={theme.colors.rust[500]} />
+        <Text style={styles.loadingText}>Loading Valor Points...</Text>
       </View>
     );
   }
@@ -79,28 +106,37 @@ const PointsScreen = ({ navigation }) => {
   return (
     <ScrollView
       style={styles.container}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.colors.rust[500]]} />}
     >
-      {/* Points Header */}
+      {/* Points Header with Warm Espresso & Rust styling */}
       <View style={styles.header}>
         <View style={styles.pointsCircle}>
+          <View style={styles.badgePill}>
+            <Text style={styles.badgePillText}>HONOR & MILESTONES</Text>
+          </View>
           <Text style={styles.pointsValue}>{pointsData.total_points}</Text>
-          <Text style={styles.pointsLabel}>Total Points</Text>
+          <Text style={styles.pointsLabel}>Total Valor Points</Text>
         </View>
         
         <View style={styles.statsRow}>
           <View style={styles.statItem}>
-            <Ionicons name="flame" size={24} color="#ef4444" />
-            <Text style={styles.statValue}>{pointsData.current_streak}</Text>
+            <View style={styles.statIconCircle}>
+              <Ionicons name="flame" size={20} color={theme.colors.rust[500]} />
+            </View>
+            <Text style={styles.statValue}>{pointsData.current_streak} days</Text>
             <Text style={styles.statLabel}>Current Streak</Text>
           </View>
           <View style={styles.statItem}>
-            <Ionicons name="trophy" size={24} color="#f59e0b" />
-            <Text style={styles.statValue}>{pointsData.longest_streak}</Text>
+            <View style={styles.statIconCircle}>
+              <Ionicons name="trophy" size={20} color="#D97706" />
+            </View>
+            <Text style={styles.statValue}>{pointsData.longest_streak} days</Text>
             <Text style={styles.statLabel}>Best Streak</Text>
           </View>
           <View style={styles.statItem}>
-            <Ionicons name="checkbox" size={24} color="#10b981" />
+            <View style={styles.statIconCircle}>
+              <Ionicons name="shield-checkmark" size={20} color={theme.colors.status.stable} />
+            </View>
             <Text style={styles.statValue}>{pointsData.tasks_completed}</Text>
             <Text style={styles.statLabel}>Tasks Done</Text>
           </View>
@@ -110,7 +146,7 @@ const PointsScreen = ({ navigation }) => {
       {/* Rewards Section */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Rewards & Badges</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rewardsScroll}>
           {pointsData.rewards.map((reward) => (
             <View
               key={reward.id}
@@ -123,12 +159,12 @@ const PointsScreen = ({ navigation }) => {
               <Text style={styles.rewardPoints}>{reward.points_required} pts</Text>
               {reward.earned ? (
                 <View style={styles.earnedBadge}>
-                  <Ionicons name="checkmark-circle" size={16} color="#10b981" />
+                  <Ionicons name="checkmark-circle" size={14} color={theme.colors.status.stable} />
                   <Text style={styles.earnedText}>Earned</Text>
                 </View>
               ) : (
                 <View style={styles.lockedBadge}>
-                  <Ionicons name="lock-closed" size={16} color="#9ca3af" />
+                  <Ionicons name="lock-closed" size={14} color={theme.colors.espresso[400]} />
                   <Text style={styles.lockedText}>Locked</Text>
                 </View>
               )}
@@ -139,15 +175,15 @@ const PointsScreen = ({ navigation }) => {
 
       {/* Leaderboard */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Leaderboard</Text>
+        <Text style={styles.sectionTitle}>Cohort Standings</Text>
         <View style={styles.leaderboardContainer}>
           {pointsData.leaderboard.map((entry) => (
             <View
               key={entry.rank}
               style={[styles.leaderboardItem, entry.isCurrentUser && styles.leaderboardItemCurrentUser]}
             >
-              <View style={[styles.rankBadge, entry.rank <= 3 && styles.rankBadgeTop]}>
-                <Text style={[styles.rankText, entry.rank <= 3 && styles.rankTextTop]}>
+              <View style={[styles.rankBadge, entry.rank <= 3 && styles.rankBadgeTop, entry.isCurrentUser && styles.rankBadgeCurrentUser]}>
+                <Text style={[styles.rankText, entry.rank <= 3 && styles.rankTextTop, entry.isCurrentUser && styles.rankTextCurrentUser]}>
                   #{entry.rank}
                 </Text>
               </View>
@@ -158,7 +194,10 @@ const PointsScreen = ({ navigation }) => {
                 <Text style={styles.leaderboardPoints}>{entry.points} pts</Text>
               </View>
               {entry.isCurrentUser && (
-                <Ionicons name="person" size={20} color="#2563eb" />
+                <View style={styles.currentUserIndicator}>
+                  <Ionicons name="person" size={16} color={theme.colors.rust[500]} />
+                  <Text style={styles.currentUserBadgeText}>You</Text>
+                </View>
               )}
             </View>
           ))}
@@ -167,14 +206,14 @@ const PointsScreen = ({ navigation }) => {
 
       {/* Recent Activity */}
       <View style={[styles.section, styles.sectionLast]}>
-        <Text style={styles.sectionTitle}>Recent Activity</Text>
+        <Text style={styles.sectionTitle}>Points Activity</Text>
         {pointsData.recent_activity.map((activity, index) => (
           <View key={index} style={styles.activityItem}>
             <View style={[styles.activityIcon, activity.points > 0 && styles.activityIconPositive]}>
               <Ionicons
                 name={activity.points > 0 ? "add" : "remove"}
                 size={16}
-                color={activity.points > 0 ? "#10b981" : "#ef4444"}
+                color={activity.points > 0 ? theme.colors.status.stable : theme.colors.status.urgent}
               />
             </View>
             <View style={styles.activityInfo}>
@@ -182,7 +221,7 @@ const PointsScreen = ({ navigation }) => {
               <Text style={styles.activityTime}>{formatDate(activity.timestamp)}</Text>
             </View>
             <Text style={[styles.activityPoints, activity.points > 0 && styles.activityPointsPositive]}>
-              +{activity.points}
+              +{activity.points} pts
             </Text>
           </View>
         ))}
@@ -194,209 +233,292 @@ const PointsScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: theme.colors.cream[200],
   },
   loadingContainer: {
     flex: 1,
+    backgroundColor: theme.colors.cream[200],
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 20,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: theme.colors.espresso[400],
+    fontWeight: '600',
   },
   header: {
-    backgroundColor: '#1e3a5f',
-    padding: 20,
+    backgroundColor: theme.colors.espresso[900],
+    padding: 24,
     paddingTop: 30,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+    ...theme.shadows.warmMd,
+  },
+  badgePill: {
+    backgroundColor: 'rgba(217, 107, 39, 0.25)',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 20,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(217, 107, 39, 0.4)',
+  },
+  badgePillText: {
+    color: theme.colors.rust[300],
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.2,
   },
   pointsCircle: {
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 24,
   },
   pointsValue: {
-    fontSize: 48,
-    fontWeight: 'bold',
-    color: '#f59e0b',
+    fontSize: 52,
+    fontWeight: '900',
+    color: theme.colors.rust[400],
+    letterSpacing: -1,
   },
   pointsLabel: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: theme.colors.cream[300],
     marginTop: 4,
+    fontWeight: '600',
   },
   statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 16,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   statItem: {
     alignItems: 'center',
   },
+  statIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
   statValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginTop: 8,
+    fontSize: 16,
+    fontWeight: '800',
+    color: theme.colors.cream[50],
   },
   statLabel: {
-    fontSize: 12,
-    color: '#94a3b8',
-    marginTop: 4,
+    fontSize: 11,
+    color: theme.colors.cream[400],
+    marginTop: 2,
+    fontWeight: '600',
   },
   section: {
     padding: 16,
   },
   sectionLast: {
-    paddingBottom: 100,
+    paddingBottom: 110,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1f2937',
-    marginBottom: 12,
+    fontWeight: '800',
+    color: theme.colors.espresso[900],
+    marginBottom: 14,
+    letterSpacing: -0.3,
+  },
+  rewardsScroll: {
+    paddingRight: 8,
   },
   rewardCard: {
-    width: 140,
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    width: 145,
+    backgroundColor: theme.colors.cream[50],
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: theme.colors.cream[400],
     padding: 16,
     marginRight: 12,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
+    ...theme.shadows.warm,
   },
   rewardCardEarned: {
-    borderWidth: 2,
-    borderColor: '#10b981',
+    borderColor: theme.colors.rust[500],
+    backgroundColor: theme.colors.cream[100],
   },
   rewardIcon: {
-    fontSize: 32,
+    fontSize: 34,
     marginBottom: 8,
   },
   rewardName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#6b7280',
+    fontSize: 13,
+    fontWeight: '700',
+    color: theme.colors.espresso[400],
     marginBottom: 4,
+    textAlign: 'center',
   },
   rewardNameEarned: {
-    color: '#1f2937',
+    color: theme.colors.espresso[900],
   },
   rewardPoints: {
     fontSize: 12,
-    color: '#9ca3af',
-    marginBottom: 8,
+    fontWeight: '700',
+    color: theme.colors.rust[500],
+    marginBottom: 10,
   },
   earnedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
   },
   earnedText: {
-    fontSize: 12,
-    color: '#10b981',
+    fontSize: 11,
+    fontWeight: '700',
+    color: theme.colors.status.stable,
     marginLeft: 4,
   },
   lockedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: theme.colors.cream[300],
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
   },
   lockedText: {
-    fontSize: 12,
-    color: '#9ca3af',
+    fontSize: 11,
+    fontWeight: '600',
+    color: theme.colors.espresso[400],
     marginLeft: 4,
   },
   leaderboardContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: theme.colors.cream[50],
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: theme.colors.cream[400],
     overflow: 'hidden',
+    ...theme.shadows.warm,
   },
   leaderboardItem: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
+    borderBottomColor: theme.colors.cream[300],
   },
   leaderboardItemCurrentUser: {
-    backgroundColor: '#eff6ff',
+    backgroundColor: theme.colors.peach[100],
+    borderLeftWidth: 4,
+    borderLeftColor: theme.colors.rust[500],
   },
   rankBadge: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: theme.colors.cream[300],
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
   rankBadgeTop: {
-    backgroundColor: '#fef3c7',
+    backgroundColor: theme.colors.peach[200],
+  },
+  rankBadgeCurrentUser: {
+    backgroundColor: theme.colors.rust[500],
   },
   rankText: {
     fontSize: 12,
-    fontWeight: 'bold',
-    color: '#6b7280',
+    fontWeight: '800',
+    color: theme.colors.espresso[700],
   },
   rankTextTop: {
-    color: '#f59e0b',
+    color: theme.colors.rust[700],
+  },
+  rankTextCurrentUser: {
+    color: '#fff',
   },
   leaderboardInfo: {
     flex: 1,
   },
   leaderboardName: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#1f2937',
+    fontSize: 15,
+    fontWeight: '600',
+    color: theme.colors.espresso[900],
   },
   leaderboardNameCurrentUser: {
-    fontWeight: 'bold',
-    color: '#2563eb',
+    fontWeight: '800',
+    color: theme.colors.rust[700],
   },
   leaderboardPoints: {
     fontSize: 13,
-    color: '#6b7280',
+    fontWeight: '700',
+    color: theme.colors.espresso[400],
     marginTop: 2,
+  },
+  currentUserIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.peach[200],
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  currentUserBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: theme.colors.rust[700],
+    marginLeft: 4,
   },
   activityItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: theme.colors.cream[50],
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: theme.colors.cream[400],
+    padding: 14,
     marginBottom: 8,
+    ...theme.shadows.warm,
   },
   activityIcon: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: theme.colors.cream[300],
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
   activityIconPositive: {
-    backgroundColor: '#d1fae5',
+    backgroundColor: '#ECFDF5',
   },
   activityInfo: {
     flex: 1,
   },
   activityReason: {
     fontSize: 14,
-    fontWeight: '500',
-    color: '#1f2937',
+    fontWeight: '600',
+    color: theme.colors.espresso[900],
   },
   activityTime: {
     fontSize: 12,
-    color: '#9ca3af',
+    color: theme.colors.espresso[400],
     marginTop: 2,
   },
   activityPoints: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#6b7280',
+    fontSize: 15,
+    fontWeight: '800',
+    color: theme.colors.espresso[700],
   },
   activityPointsPositive: {
-    color: '#10b981',
+    color: theme.colors.status.stable,
   },
 });
 

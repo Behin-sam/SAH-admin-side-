@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, VeteranProfile, Task, DailyMetrics, CheckInSurvey, AIInsight, NotificationItem, CounselorNote, UserRole, TaskStatus } from '../types';
 import { CURRENT_COUNSELOR, DEMO_VETERANS, INITIAL_TASKS_VET_1, INITIAL_TASKS_VET_3, MOCK_AI_INSIGHTS, MOCK_NOTIFICATIONS, MOCK_COUNSELOR_NOTES, generate30DayMetrics } from '../data/mockData';
+import { apiService } from '../services/api';
 
 interface AppContextType {
   // Authentication & Role
@@ -91,6 +92,80 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       notes: 'Feeling steady and aligned with morning routine.'
     }
   ]);
+
+  // Synchronize state with backend on startup
+  useEffect(() => {
+    async function syncFromBackend() {
+      try {
+        const demoData = await apiService.getDemoUsers();
+        if (demoData?.veterans && demoData.veterans.length > 0) {
+          const syncedVeterans = demoData.veterans.map((v: any, idx: number) => ({
+            user: {
+              id: v.id,
+              name: v.name,
+              rank: v.rank,
+              unit: v.unit || 'Para Special Forces',
+              role: 'veteran' as UserRole,
+              avatarUrl: v.avatarUrl,
+              email: v.email,
+              isEmailVerified: true,
+              assignedCounselorId: 'counselor-01',
+              assignedCounselorName: 'Dr. Ananya Nair',
+              serviceBranch: v.service_branch,
+            },
+            profile: {
+              veteranId: v.id,
+              serviceBranch: v.service_branch,
+              yearsOfService: 10,
+              physicalActivityLevel: 'Moderate' as const,
+              socialInteractionLevel: 'Moderate' as const,
+              sleepConsistencyLevel: 'Moderate' as const,
+              outdoorEngagementLevel: 'High' as const,
+              routineStabilityLevel: 'Moderate' as const,
+              recommendedFocus: ['Grounding', 'Cardio walk', 'Peer group'],
+              checkInFrequencyDays: 7,
+              streakDays: v.current_streak || 5,
+              totalXP: v.total_points || 250,
+              level: Math.floor((v.total_points || 250) / 300) + 1,
+              badges: DEMO_VETERANS[idx % DEMO_VETERANS.length]?.profile?.badges || [],
+              currentRiskLevel: 'NORMAL' as const,
+            },
+          }));
+
+          setAllVeterans(syncedVeterans);
+          setActiveVeteranId(syncedVeterans[0].user.id);
+          setCurrentUser(syncedVeterans[0].user);
+
+          // Fetch dashboard for active veteran
+          try {
+            const dash = await apiService.getVeteranDashboard(syncedVeterans[0].user.id);
+            if (dash?.today_tasks?.length) {
+              const liveTasks: Task[] = dash.today_tasks.map((t: any) => ({
+                id: t.id,
+                title: t.title,
+                description: t.description,
+                category: t.type === 'physical' ? 'Physical' : t.type === 'social' ? 'Social' : 'Mental',
+                difficulty: 'Moderate',
+                xpReward: t.points,
+                status: t.status === 'completed' ? 'completed' : 'pending',
+                targetMetric: t.type,
+                targetValue: 1,
+                currentValue: t.status === 'completed' ? 1 : 0,
+                unit: 'session',
+                gpsRequired: t.gps_required,
+              }));
+              setTasksMap(prev => ({ ...prev, [syncedVeterans[0].user.id]: liveTasks }));
+            }
+          } catch (e) {
+            console.warn('Dashboard fetch fallback:', e);
+          }
+        }
+      } catch (e) {
+        console.warn('Backend offline, using local mock data.');
+      }
+    }
+    syncFromBackend();
+  }, []);
 
   // Auth Methods
   const loginWithCredentials = (email: string, role: UserRole) => {
@@ -238,6 +313,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       },
       ...prev
     ]);
+
+    // Async backend mutation
+    apiService.completeTask(activeVeteranId, taskId).catch(() => {});
   };
 
   const skipTask = (taskId: string, reason?: string) => {
@@ -255,6 +333,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
       return { ...prev, [activeVeteranId]: updated };
     });
+
+    // Async backend mutation
+    apiService.skipTask(activeVeteranId, taskId, reason).catch(() => {});
   };
 
   const submitCheckIn = (surveyData: Omit<CheckInSurvey, 'id' | 'date'>) => {

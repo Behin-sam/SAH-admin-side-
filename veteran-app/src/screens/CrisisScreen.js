@@ -1,6 +1,7 @@
 /**
  * Crisis Screen
  * Emergency contacts, crisis hotlines, and immediate support resources
+ * Styled with VALOR trauma-informed design system
  */
 
 import React from 'react';
@@ -14,6 +15,7 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { theme } from '../constants/theme';
 
 const CRISIS_RESOURCES = [
   {
@@ -21,8 +23,8 @@ const CRISIS_RESOURCES = [
     name: 'Veterans Crisis Line',
     phone: '988',
     subtitle: 'Press 1 after calling',
-    description: 'Free, confidential support 24/7 for veterans and their families',
-    color: '#ef4444',
+    description: 'Free, confidential support 24/7 for veterans and their families.',
+    color: '#DC2626',
     icon: 'call',
   },
   {
@@ -30,7 +32,7 @@ const CRISIS_RESOURCES = [
     name: 'VA Health Crisis Line',
     phone: '1-800-273-8255',
     subtitle: 'Press 1 for Veterans',
-    description: 'National Suicide Prevention Lifeline',
+    description: 'National Suicide Prevention Lifeline with veteran-specialized responders.',
     color: '#2563eb',
     icon: 'medical',
   },
@@ -39,16 +41,16 @@ const CRISIS_RESOURCES = [
     name: 'Crisis Text Line',
     phone: null,
     text: 'Text HOME to 741741',
-    description: 'Free 24/7 text-based crisis support',
-    color: '#8b5cf6',
+    description: 'Free 24/7 text-based crisis intervention and grounding.',
+    color: '#7C3AED',
     icon: 'chatbubbles',
   },
   {
     id: 'tdd',
-    name: 'TTY (Deaf/Hard of Hearing)',
+    name: 'TTY Support (Deaf/Hard of Hearing)',
     phone: '1-800-799-4889',
-    subtitle: 'TTY available',
-    description: 'Veterans Crisis Line for deaf or hard of hearing',
+    subtitle: 'TTY available 24/7',
+    description: 'Accessible crisis helpline for deaf or hard of hearing service members.',
     color: '#059669',
     icon: 'accessibility',
   },
@@ -57,54 +59,54 @@ const CRISIS_RESOURCES = [
 const QUICK_ACTIONS = [
   {
     id: 'call',
-    title: '📞 Call 988 Now',
-    description: 'Immediate phone support',
+    title: '📞 Call 988 (Press 1)',
+    description: 'Immediate 24/7 phone support with veteran responder',
     phone: '988',
-    color: '#ef4444',
+    color: '#DC2626',
   },
   {
     id: 'text',
-    title: '💬 Text for Help',
-    description: 'Text HOME to 741741',
+    title: '💬 Text HOME to 741741',
+    description: 'Direct quiet text support',
     action: 'text',
-    color: '#8b5cf6',
+    color: '#7C3AED',
   },
   {
     id: 'chat',
-    title: '💻 Chat Online',
-    description: 'veteranscrisisline.net',
+    title: '💻 Online Confidential Chat',
+    description: 'veteranscrisisline.net/chat',
     url: 'https://www.veteranscrisisline.net/get-help-now/chat',
-    color: '#2563eb',
+    color: '#D96B27',
   },
   {
     id: 'nearest',
-    title: '📍 Nearest VA',
-    description: 'Find your nearest VA facility',
+    title: '📍 Nearest VA Hospital / Clinic',
+    description: 'Find physical walk-in emergency care facility',
     url: 'https://www.va.gov/find-locations/',
-    color: '#10b981',
+    color: '#059669',
   },
 ];
 
 const SAFETY_PLAN = [
-  'Recognize your warning signs',
-  'Use your coping strategies',
-  'Contact your support network',
-  'Call your counselor or therapist',
-  'Call the Veterans Crisis Line (988)',
-  'Go to your nearest VA or ER',
+  'Recognize your personal warning signs (agitation, sensory overload, isolation).',
+  'Engage 5-4-3-2-1 sensory grounding or 4-7-8 box breathing.',
+  'Reach out to your trusted battle buddy or family member.',
+  'Contact your primary clinical counselor Dr. Ananya Nair.',
+  'Call the Veterans Crisis Line (Dial 988, then press 1).',
+  'Proceed safely to your nearest VA Medical Center or Emergency Department.',
 ];
 
 const CrisisScreen = ({ navigation }) => {
   const handleCall = (phone) => {
     Linking.openURL(`tel:${phone}`).catch(() => {
-      Alert.alert('Error', 'Could not open phone dialer');
+      Alert.alert('Phone Call', `Please dial ${phone} directly from your phone app.`);
     });
   };
 
   const handleText = () => {
     Alert.alert(
-      '📱 Send Text',
-      'This will open your messaging app to text HOME to 741741',
+      'Send Text to 741741',
+      'This will open your messaging app to text "HOME" to 741741.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -117,24 +119,26 @@ const CrisisScreen = ({ navigation }) => {
 
   const handleURL = (url) => {
     Linking.openURL(url).catch(() => {
-      Alert.alert('Error', 'Could not open URL');
+      Alert.alert('Open Browser', `Please visit: ${url}`);
     });
   };
 
   return (
-    <ScrollView style={styles.container}>
-      {/* Emergency Header */}
+    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+      {/* Emergency SOS Header */}
       <View style={styles.emergencyHeader}>
-        <Ionicons name="warning" size={40} color="#fff" />
-        <Text style={styles.emergencyTitle}>Crisis Support</Text>
+        <View style={styles.headerIconCircle}>
+          <Ionicons name="shield-alert" size={32} color="#fff" />
+        </View>
+        <Text style={styles.emergencyTitle}>Immediate Crisis Support</Text>
         <Text style={styles.emergencySubtitle}>
-          You are not alone. Help is available 24/7.
+          You are never alone. Confidential, free support is available 24/7.
         </Text>
       </View>
 
-      {/* Quick Actions */}
+      {/* Primary Quick Actions */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Get Help Now</Text>
+        <Text style={styles.sectionTitle}>Urgent Actions</Text>
         {QUICK_ACTIONS.map((action) => (
           <TouchableOpacity
             key={action.id}
@@ -149,43 +153,45 @@ const CrisisScreen = ({ navigation }) => {
               <Text style={styles.quickActionTitle}>{action.title}</Text>
               <Text style={styles.quickActionDesc}>{action.description}</Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+            <Ionicons name="chevron-forward" size={20} color={theme.colors.espresso[400]} />
           </TouchableOpacity>
         ))}
       </View>
 
       {/* Crisis Hotlines */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Crisis Hotlines</Text>
+        <Text style={styles.sectionTitle}>Emergency Helplines</Text>
         {CRISIS_RESOURCES.map((resource) => (
           <View key={resource.id} style={styles.resourceCard}>
-            <View style={[styles.resourceIcon, { backgroundColor: resource.color + '20' }]}>
-              <Ionicons name={resource.icon} size={24} color={resource.color} />
+            <View style={[styles.resourceIcon, { backgroundColor: resource.color + '15' }]}>
+              <Ionicons name={resource.icon} size={22} color={resource.color} />
             </View>
             <View style={styles.resourceInfo}>
               <Text style={styles.resourceName}>{resource.name}</Text>
               <Text style={styles.resourceDesc}>{resource.description}</Text>
               {resource.phone ? (
-                <TouchableOpacity onPress={() => handleCall(resource.phone)}>
-                  <Text style={[styles.resourcePhone, { color: resource.color }]}>
-                    📞 {resource.phone} {resource.subtitle ? `(${resource.subtitle})` : ''}
+                <TouchableOpacity onPress={() => handleCall(resource.phone)} style={styles.dialButton}>
+                  <Ionicons name="call" size={14} color="#fff" style={{ marginRight: 6 }} />
+                  <Text style={styles.dialButtonText}>
+                    Dial {resource.phone} {resource.subtitle ? `(${resource.subtitle})` : ''}
                   </Text>
                 </TouchableOpacity>
               ) : (
-                <Text style={[styles.resourcePhone, { color: resource.color }]}>
-                  {resource.text}
-                </Text>
+                <TouchableOpacity onPress={() => handleText()} style={[styles.dialButton, { backgroundColor: resource.color }]}>
+                  <Ionicons name="chatbubble-ellipses" size={14} color="#fff" style={{ marginRight: 6 }} />
+                  <Text style={styles.dialButtonText}>{resource.text}</Text>
+                </TouchableOpacity>
               )}
             </View>
           </View>
         ))}
       </View>
 
-      {/* My Safety Plan */}
+      {/* Safety Protocol Plan */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>My Safety Plan</Text>
+        <Text style={styles.sectionTitle}>Your Step-by-Step Safety Plan</Text>
         <Text style={styles.safetyPlanIntro}>
-          When I'm in crisis, I will:
+          If feelings of distress, panic, or thoughts of harm occur, follow these 6 steps in sequence:
         </Text>
         {SAFETY_PLAN.map((step, index) => (
           <View key={index} style={styles.safetyStep}>
@@ -197,18 +203,16 @@ const CrisisScreen = ({ navigation }) => {
         ))}
       </View>
 
-      {/* Comfort Message */}
+      {/* Compassionate Message Box */}
       <View style={styles.comfortContainer}>
-        <Text style={styles.comfortEmoji}>💙</Text>
+        <Ionicons name="heart" size={32} color={theme.colors.rust[500]} style={{ marginBottom: 8 }} />
         <Text style={styles.comfortText}>
-          "Your life matters. Your service matters. You matter."
+          "Your service was profound. Your survival matters. There is always hope and another dawn."
         </Text>
         <Text style={styles.comfortSubtext}>
-          Reach out anytime. There is always someone who wants to help.
+          Dr. Ananya Nair & The SAH Clinical Team
         </Text>
       </View>
-
-      <View style={{ height: 40 }} />
     </ScrollView>
   );
 };
@@ -216,156 +220,189 @@ const CrisisScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: theme.colors.cream[200],
+  },
+  scrollContent: {
+    paddingBottom: 110,
   },
   emergencyHeader: {
-    backgroundColor: '#ef4444',
-    padding: 30,
-    paddingTop: 50,
+    backgroundColor: theme.colors.status.urgent,
+    padding: 24,
+    paddingTop: 32,
     alignItems: 'center',
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+    ...theme.shadows.warmMd,
+  },
+  headerIconCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
   },
   emergencyTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
+    fontSize: 24,
+    fontWeight: '900',
     color: '#fff',
-    marginTop: 12,
+    letterSpacing: -0.5,
   },
   emergencySubtitle: {
-    fontSize: 16,
-    color: '#fecaca',
-    marginTop: 8,
+    fontSize: 14,
+    color: '#FEE2E2',
+    marginTop: 6,
     textAlign: 'center',
+    lineHeight: 20,
+    paddingHorizontal: 16,
   },
   section: {
     padding: 16,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1f2937',
+    fontWeight: '800',
+    color: theme.colors.espresso[900],
     marginBottom: 12,
+    letterSpacing: -0.3,
   },
   quickAction: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: theme.colors.cream[50],
+    borderRadius: 14,
     padding: 16,
-    marginBottom: 8,
-    borderLeftWidth: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
+    marginBottom: 10,
+    borderLeftWidth: 5,
+    borderWidth: 1,
+    borderColor: theme.colors.cream[400],
+    ...theme.shadows.warm,
   },
   quickActionContent: {
     flex: 1,
   },
   quickActionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1f2937',
+    fontSize: 15,
+    fontWeight: '800',
+    color: theme.colors.espresso[900],
+    marginBottom: 4,
   },
   quickActionDesc: {
     fontSize: 13,
-    color: '#6b7280',
-    marginTop: 2,
+    color: theme.colors.espresso[400],
   },
   resourceCard: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: theme.colors.cream[50],
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: theme.colors.cream[400],
     padding: 16,
-    marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
+    marginBottom: 12,
+    ...theme.shadows.warm,
   },
   resourceIcon: {
-    width: 48,
-    height: 48,
+    width: 44,
+    height: 44,
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 14,
   },
   resourceInfo: {
     flex: 1,
   },
   resourceName: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#1f2937',
+    fontWeight: '800',
+    color: theme.colors.espresso[900],
+    marginBottom: 4,
   },
   resourceDesc: {
     fontSize: 13,
-    color: '#6b7280',
-    marginTop: 2,
+    color: theme.colors.espresso[400],
+    lineHeight: 18,
+    marginBottom: 10,
   },
-  resourcePhone: {
-    fontSize: 15,
-    fontWeight: '600',
-    marginTop: 6,
+  dialButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: theme.colors.status.urgent,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  dialButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '800',
   },
   safetyPlanIntro: {
-    fontSize: 15,
-    color: '#4b5563',
+    fontSize: 14,
+    color: theme.colors.espresso[700],
     marginBottom: 12,
-    fontStyle: 'italic',
+    lineHeight: 20,
   },
   safetyStep: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
+    alignItems: 'flex-start',
+    backgroundColor: theme.colors.cream[50],
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: theme.colors.cream[400],
+    padding: 14,
+    marginBottom: 8,
+    ...theme.shadows.warm,
   },
   stepNumber: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#2563eb',
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: theme.colors.rust[500],
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
+    marginTop: 1,
   },
   stepNumberText: {
-    fontSize: 14,
-    fontWeight: 'bold',
     color: '#fff',
+    fontSize: 12,
+    fontWeight: '800',
   },
   stepText: {
     flex: 1,
-    fontSize: 14,
-    color: '#374151',
-    lineHeight: 20,
+    fontSize: 13,
+    color: theme.colors.espresso[900],
+    lineHeight: 19,
+    fontWeight: '500',
   },
   comfortContainer: {
     margin: 16,
-    backgroundColor: '#eff6ff',
+    backgroundColor: theme.colors.peach[100],
     borderRadius: 16,
-    padding: 24,
+    borderWidth: 1,
+    borderColor: theme.colors.peach[300],
+    padding: 20,
     alignItems: 'center',
-  },
-  comfortEmoji: {
-    fontSize: 40,
-    marginBottom: 12,
+    ...theme.shadows.warm,
   },
   comfortText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1e3a5f',
+    fontSize: 15,
+    fontStyle: 'italic',
+    fontWeight: '700',
+    color: theme.colors.espresso[900],
     textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: 22,
+    marginBottom: 6,
   },
   comfortSubtext: {
-    fontSize: 14,
-    color: '#6b7280',
-    textAlign: 'center',
-    marginTop: 8,
+    fontSize: 12,
+    color: theme.colors.rust[700],
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
   },
 });
 

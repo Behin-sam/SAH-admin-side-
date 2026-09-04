@@ -26,6 +26,8 @@ import CrisisScreen from './src/screens/CrisisScreen';
 
 import { storage } from './src/services/storage';
 import { notificationService } from './src/services/notifications';
+import { authAPI } from './src/services/api';
+import { theme } from './src/constants/theme';
 
 const AuthContext = createContext(null);
 export const useAuth = () => useContext(AuthContext);
@@ -46,11 +48,26 @@ function MainTabs() {
           else if (route.name === 'Profile') iconName = focused ? 'person' : 'person-outline';
           return <Ionicons name={iconName} size={size} color={color} />;
         },
-        tabBarActiveTintColor: '#2563eb',
-        tabBarInactiveTintColor: '#6b7280',
-        headerStyle: { backgroundColor: '#1e3a5f' },
-        headerTintColor: '#fff',
-        headerTitleStyle: { fontWeight: 'bold' },
+        tabBarActiveTintColor: theme.colors.rust[500],
+        tabBarInactiveTintColor: theme.colors.espresso[400],
+        tabBarStyle: {
+          backgroundColor: theme.colors.cream[100],
+          borderTopColor: theme.colors.cream[400],
+          borderTopWidth: 1,
+        },
+        headerStyle: {
+          backgroundColor: theme.colors.cream[200],
+          borderBottomColor: theme.colors.cream[400],
+          borderBottomWidth: 1,
+          elevation: 0,
+          shadowOpacity: 0,
+        },
+        headerTintColor: theme.colors.espresso[900],
+        headerTitleStyle: {
+          fontWeight: '800',
+          fontSize: 18,
+          color: theme.colors.espresso[900],
+        },
       })}
     >
       <Tab.Screen name="Dashboard" component={DashboardScreen} />
@@ -75,13 +92,61 @@ function MainStack() {
   return (
     <Stack.Navigator>
       <Stack.Screen name="MainTabs" component={MainTabs} options={{ headerShown: false }} />
-      <Stack.Screen name="TaskDetail" component={TaskDetailScreen} options={{ title: 'Task Details', headerStyle: { backgroundColor: '#1e3a5f' }, headerTintColor: '#fff' }} />
-      <Stack.Screen name="GPSTracking" component={GPSTrackingScreen} options={{ title: 'GPS Tracking', headerStyle: { backgroundColor: '#1e3a5f' }, headerTintColor: '#fff' }} />
-      <Stack.Screen name="GroupDetail" component={GroupDetailScreen} options={{ title: 'Group Details', headerStyle: { backgroundColor: '#1e3a5f' }, headerTintColor: '#fff' }} />
-      <Stack.Screen name="Chat" component={ChatScreen} options={{ title: 'Counselor Chat', headerStyle: { backgroundColor: '#1e3a5f' }, headerTintColor: '#fff' }} />
+      <Stack.Screen
+        name="TaskDetail"
+        component={TaskDetailScreen}
+        options={{
+          title: 'Task Details',
+          headerStyle: { backgroundColor: theme.colors.cream[200], borderBottomColor: theme.colors.cream[400], borderBottomWidth: 1 },
+          headerTintColor: theme.colors.espresso[900],
+        }}
+      />
+      <Stack.Screen
+        name="GPSTracking"
+        component={GPSTrackingScreen}
+        options={{
+          title: 'GPS Tracking',
+          headerStyle: { backgroundColor: theme.colors.cream[200], borderBottomColor: theme.colors.cream[400], borderBottomWidth: 1 },
+          headerTintColor: theme.colors.espresso[900],
+        }}
+      />
+      <Stack.Screen
+        name="GroupDetail"
+        component={GroupDetailScreen}
+        options={{
+          title: 'Group Details',
+          headerStyle: { backgroundColor: theme.colors.cream[200], borderBottomColor: theme.colors.cream[400], borderBottomWidth: 1 },
+          headerTintColor: theme.colors.espresso[900],
+        }}
+      />
+      <Stack.Screen
+        name="Chat"
+        component={ChatScreen}
+        options={{
+          title: 'Counselor Chat',
+          headerStyle: { backgroundColor: theme.colors.cream[200], borderBottomColor: theme.colors.cream[400], borderBottomWidth: 1 },
+          headerTintColor: theme.colors.espresso[900],
+        }}
+      />
       <Stack.Screen name="VideoCall" component={VideoCallScreen} options={{ headerShown: false }} />
-      <Stack.Screen name="Crisis" component={CrisisScreen} options={{ title: 'Crisis Support', headerStyle: { backgroundColor: '#ef4444' }, headerTintColor: '#fff' }} />
-      <Stack.Screen name="Admin" component={AdminScreen} options={{ title: 'Admin Dashboard', headerStyle: { backgroundColor: '#7c3aed' }, headerTintColor: '#fff' }} />
+      <Stack.Screen
+        name="Crisis"
+        component={CrisisScreen}
+        options={{
+          title: 'Crisis Support',
+          headerStyle: { backgroundColor: theme.colors.status.urgent },
+          headerTintColor: '#fff',
+        }}
+      />
+      <Stack.Screen
+        name="Admin"
+        component={AdminScreen}
+        options={{
+          title: 'Admin Dashboard',
+          headerStyle: { backgroundColor: theme.colors.espresso[900] },
+          headerTintColor: '#fff',
+        }}
+      />
     </Stack.Navigator>
   );
 }
@@ -109,8 +174,26 @@ export default function App() {
     } catch (e) { /* no stored auth */ } finally { setLoading(false); }
   };
 
-  const login = async (email, password) => {
-    const mockUser = { id: 'demo-veteran-001', name: 'Demo Veteran', email, service_branch: 'Army', rank: 'E-5', total_points: 0, current_streak: 0 };
+  const login = async (email, password, role = 'veteran') => {
+    try {
+      const res = await authAPI.login(email, password, role);
+      if (res?.user) {
+        await storage.set('user', JSON.stringify(res.user));
+        setUser(res.user);
+        return { success: true };
+      }
+    } catch (e) {
+      console.warn('Backend login fallback:', e);
+    }
+    const mockUser = {
+      id: '550e8400-e29b-41d4-a716-446655440001',
+      name: 'Capt. Vikram Rathore',
+      email,
+      service_branch: 'Indian Army (Para SF)',
+      rank: 'Captain',
+      total_points: 250,
+      current_streak: 5,
+    };
     await storage.set('user', JSON.stringify(mockUser));
     setUser(mockUser);
     return { success: true };
@@ -120,8 +203,8 @@ export default function App() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1e3a5f' }}>
-        <ActivityIndicator size="large" color="#fff" />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.cream[200] }}>
+        <ActivityIndicator size="large" color={theme.colors.rust[500]} />
       </View>
     );
   }

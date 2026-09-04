@@ -14,8 +14,12 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../../App';
+import { theme } from '../constants/theme';
+import { taskAPI } from '../services/api';
 
 const TasksScreen = ({ navigation }) => {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState('all');
@@ -23,10 +27,33 @@ const TasksScreen = ({ navigation }) => {
 
   useEffect(() => {
     loadTasks();
-  }, []);
+  }, [user]);
 
   const loadTasks = async () => {
     try {
+      if (user?.id) {
+        try {
+          const liveTasks = await taskAPI.getTasks(user.id);
+          if (liveTasks && liveTasks.length > 0) {
+            setTasks(liveTasks.map(t => ({
+              id: t.id,
+              type: t.task_type || t.type,
+              title: t.title,
+              description: t.description,
+              points: t.points,
+              status: t.status,
+              difficulty: t.difficulty || 1,
+              category: t.category || 'wellness',
+              gps_required: t.gps_required,
+            })));
+            setLoading(false);
+            setRefreshing(false);
+            return;
+          }
+        } catch (apiErr) {
+          console.warn('Live task fetch fallback:', apiErr.message);
+        }
+      }
       // Mock data for demo
       const mockTasks = [
         // Mental / Psychological
@@ -303,12 +330,13 @@ const TasksScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: theme.colors.cream[200],
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: theme.colors.cream[200],
   },
   filterContainer: {
     maxHeight: 60,
@@ -319,19 +347,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: '#e5e7eb',
+    backgroundColor: theme.colors.cream[400],
     marginRight: 8,
   },
   filterTabActive: {
-    backgroundColor: '#2563eb',
+    backgroundColor: theme.colors.rust[500],
   },
   filterText: {
     fontSize: 14,
-    color: '#4b5563',
-    fontWeight: '500',
+    color: theme.colors.espresso[900],
+    fontWeight: '600',
   },
   filterTextActive: {
     color: '#fff',
+    fontWeight: '700',
   },
   tasksList: {
     flex: 1,
@@ -344,20 +373,18 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: '#9ca3af',
+    color: theme.colors.espresso[400],
     marginTop: 12,
   },
   taskCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: theme.colors.cream[50],
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: theme.colors.cream[400],
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
+    ...theme.shadows.warm,
     overflow: 'hidden',
   },
   taskTypeIndicator: {
@@ -377,36 +404,37 @@ const styles = StyleSheet.create({
   taskTypeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f3f4f6',
+    backgroundColor: theme.colors.peach[200],
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 8,
+    borderRadius: 6,
   },
   taskTypeText: {
     fontSize: 12,
-    fontWeight: '500',
+    fontWeight: '700',
+    color: theme.colors.peach[800],
     marginLeft: 4,
     textTransform: 'capitalize',
   },
   statusBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 8,
+    borderRadius: 6,
   },
   statusText: {
     fontSize: 12,
-    fontWeight: '500',
+    fontWeight: '700',
     textTransform: 'capitalize',
   },
   taskTitle: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#1f2937',
+    fontWeight: '700',
+    color: theme.colors.espresso[900],
     marginBottom: 4,
   },
   taskDescription: {
     fontSize: 13,
-    color: '#6b7280',
+    color: theme.colors.espresso[400],
     marginBottom: 12,
     lineHeight: 18,
   },
@@ -421,8 +449,8 @@ const styles = StyleSheet.create({
   },
   taskPoints: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#f59e0b',
+    fontWeight: '700',
+    color: theme.colors.rust[500],
     marginRight: 12,
   },
   difficultyContainer: {
@@ -432,39 +460,41 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#e5e7eb',
+    backgroundColor: theme.colors.cream[400],
     marginRight: 4,
   },
   difficultyDotActive: {
-    backgroundColor: '#f59e0b',
+    backgroundColor: theme.colors.rust[500],
   },
   gpsBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#eff6ff',
+    backgroundColor: theme.colors.peach[200],
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 8,
+    borderRadius: 6,
   },
   gpsBadgeText: {
     fontSize: 11,
-    color: '#2563eb',
+    color: theme.colors.peach[800],
     marginLeft: 4,
-    fontWeight: '500',
+    fontWeight: '700',
+    textTransform: 'uppercase',
   },
   generateButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#2563eb',
+    backgroundColor: theme.colors.rust[500],
     margin: 16,
     padding: 16,
     borderRadius: 12,
+    ...theme.shadows.rustGlow,
   },
   generateButtonText: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
     marginLeft: 8,
   },
 });
