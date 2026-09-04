@@ -27,7 +27,8 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy import JSON
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 from app.database import Base
@@ -183,7 +184,7 @@ class TaskTemplate(Base):
 
     # Category and tags
     category = Column(String(50), nullable=True)
-    tags = Column(JSONB, default=list)  # ["walking", "outdoor", "easy"]
+    tags = Column(JSON, default=list)  # ["walking", "outdoor", "easy"]
 
     # Eligibility
     min_streak = Column(Integer, default=0)  # Minimum streak to unlock
@@ -275,7 +276,7 @@ class VeteranGroup(Base):
     # Group settings
     max_members = Column(Integer, default=10)
     is_public = Column(Boolean, default=True)  # Can others discover and join?
-    activity_schedule = Column(JSONB, nullable=True)  # {"days": ["mon", "wed"], "time": "10:00"}
+    activity_schedule = Column(JSON, nullable=True)  # {"days": ["mon", "wed"], "time": "10:00"}
 
     # Group stats
     member_count = Column(Integer, default=0)
@@ -412,7 +413,7 @@ class RewardTier(Base):
 
     # Rewards
     reward_type = Column(String(50), nullable=True)  # "badge", "feature_unlock", "recognition"
-    reward_data = Column(JSONB, nullable=True)  # Additional reward details
+    reward_data = Column(JSON, nullable=True)  # Additional reward details
 
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))

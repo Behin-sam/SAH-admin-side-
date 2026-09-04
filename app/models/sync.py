@@ -21,7 +21,8 @@ from datetime import datetime, timezone
 from enum import Enum as PyEnum
 
 from sqlalchemy import Column, DateTime, Enum, Integer, String, Text
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy import JSON
+from sqlalchemy.dialects.postgresql import UUID
 
 from app.database import Base
 
@@ -41,7 +42,7 @@ class SyncQueue(Base):
     survivor_id = Column(UUID(as_uuid=True), nullable=False, index=True)
 
     operation = Column(String(50), nullable=False)  # "create_checkin", "create_signal", "update_consent"
-    payload = Column(JSONB, nullable=False)          # The actual data to sync
+    payload = Column(JSON, nullable=False)          # The actual data to sync
 
     # Client metadata
     client_timestamp = Column(DateTime(timezone=True), nullable=False)

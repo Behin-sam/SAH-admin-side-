@@ -226,6 +226,13 @@ const DashboardScreen = ({ navigation }) => {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.actionButton}
+            onPress={() => navigation.navigate('Crisis')}
+          >
+            <Ionicons name="warning" size={32} color="#ef4444" />
+            <Text style={styles.actionText}>Crisis Help</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.actionButton}
             onPress={() => navigation.navigate('Points')}
           >
             <Ionicons name="gift" size={32} color="#f59e0b" />

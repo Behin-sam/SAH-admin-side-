@@ -32,7 +32,8 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy import JSON
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 from app.database import Base
@@ -133,7 +134,7 @@ class QuestionBank(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     text = Column(Text, nullable=False)
-    topic_tags = Column(JSONB, default=list)  # ["sleep", "safety", "food"]
+    topic_tags = Column(JSON, default=list)  # ["sleep", "safety", "food"]
     is_intake = Column(Boolean, default=False)  # True = part of initial 15-20 questions
     is_checkin = Column(Boolean, default=False) # True = part of 5-question rotating check-in
     is_active = Column(Boolean, default=True)   # Soft-delete for question lifecycle
@@ -258,9 +259,9 @@ class RiskTrajectoryLog(Base):
     confidence = Column(Float, nullable=False)               # 0.0 - 1.0
 
     # Explainability: which features/questions contributed most
-    contributing_features = Column(JSONB, default=list)
-    contributing_topics = Column(JSONB, default=list)
-    z_scores = Column(JSONB, default=dict)                   # Per-metric z-scores
+    contributing_features = Column(JSON, default=list)
+    contributing_topics = Column(JSON, default=list)
+    z_scores = Column(JSON, default=dict)                   # Per-metric z-scores
     trend_summary = Column(Text, nullable=True)              # Human-readable summary
 
     computed_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
@@ -307,7 +308,7 @@ class Alert(Base):
     status = Column(Enum(AlertStatus), default=AlertStatus.PENDING)
     alert_type = Column(String(50), nullable=False)           # "escalating" / "acute"
     trend_summary = Column(Text, nullable=False)              # Human-readable
-    contributing_topics = Column(JSONB, default=list)         # e.g. ["sleep", "safety"]
+    contributing_topics = Column(JSON, default=list)         # e.g. ["sleep", "safety"]
     severity_score = Column(Float, nullable=False)
 
     # Counselor response

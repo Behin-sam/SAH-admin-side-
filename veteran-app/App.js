@@ -21,6 +21,8 @@ import PointsScreen from './src/screens/PointsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import AdminScreen from './src/screens/AdminScreen';
 import ChatScreen from './src/screens/ChatScreen';
+import VideoCallScreen from './src/screens/VideoCallScreen';
+import CrisisScreen from './src/screens/CrisisScreen';
 
 import { storage } from './src/services/storage';
 import { notificationService } from './src/services/notifications';
@@ -77,6 +79,8 @@ function MainStack() {
       <Stack.Screen name="GPSTracking" component={GPSTrackingScreen} options={{ title: 'GPS Tracking', headerStyle: { backgroundColor: '#1e3a5f' }, headerTintColor: '#fff' }} />
       <Stack.Screen name="GroupDetail" component={GroupDetailScreen} options={{ title: 'Group Details', headerStyle: { backgroundColor: '#1e3a5f' }, headerTintColor: '#fff' }} />
       <Stack.Screen name="Chat" component={ChatScreen} options={{ title: 'Counselor Chat', headerStyle: { backgroundColor: '#1e3a5f' }, headerTintColor: '#fff' }} />
+      <Stack.Screen name="VideoCall" component={VideoCallScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="Crisis" component={CrisisScreen} options={{ title: 'Crisis Support', headerStyle: { backgroundColor: '#ef4444' }, headerTintColor: '#fff' }} />
       <Stack.Screen name="Admin" component={AdminScreen} options={{ title: 'Admin Dashboard', headerStyle: { backgroundColor: '#7c3aed' }, headerTintColor: '#fff' }} />
     </Stack.Navigator>
   );

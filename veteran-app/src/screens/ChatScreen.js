@@ -11,6 +11,7 @@ import {
   FlatList,
   TextInput,
   TouchableOpacity,
+  Linking,
   KeyboardAvoidingView,
   Platform,
   Alert,
@@ -110,11 +111,15 @@ const ChatScreen = ({ route, navigation }) => {
   const handleEmergency = () => {
     Alert.alert(
       '🚨 Emergency Support',
-      'This will send an immediate message to an on-duty counselor.',
+      'Choose how you need help:',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Send Emergency',
+          text: '📞 Call Veterans Crisis Line',
+          onPress: () => Linking.openURL('tel:988').catch(() => {}),
+        },
+        {
+          text: '💬 Send Emergency Message',
           style: 'destructive',
           onPress: () => {
             const emergencyMsg = {
@@ -130,6 +135,18 @@ const ChatScreen = ({ route, navigation }) => {
         },
       ]
     );
+  };
+
+  const handleVideoCall = () => {
+    navigation.navigate('VideoCall', {
+      counselorName: counselorName || 'Dr. Sarah Mitchell',
+      counselorTitle: 'Licensed Clinical Social Worker',
+      conversationId,
+    });
+  };
+
+  const handleCrisisLine = () => {
+    navigation.navigate('Crisis');
   };
 
   const formatTime = (dateString) => {
@@ -174,6 +191,9 @@ const ChatScreen = ({ route, navigation }) => {
           <Text style={styles.headerName}>{counselorName || 'Counselor'}</Text>
           <Text style={styles.headerStatus}>● Online</Text>
         </View>
+        <TouchableOpacity onPress={handleVideoCall} style={styles.videoCallButton}>
+          <Ionicons name="videocam" size={20} color="#10b981" />
+        </TouchableOpacity>
         <TouchableOpacity onPress={handleEmergency} style={styles.emergencyButton}>
           <Ionicons name="warning" size={20} color="#ef4444" />
         </TouchableOpacity>
@@ -262,6 +282,15 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#10b981',
     marginTop: 2,
+  },
+  videoCallButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(16,185,129,0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
   },
   emergencyButton: {
     width: 40,
