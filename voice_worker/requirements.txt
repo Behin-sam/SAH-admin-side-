@@ -1,0 +1,9 @@
+# Voice Worker Microservice Dependencies
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.2
+numpy==1.26.2
+librosa==0.10.1          # Audio analysis
+soundfile==0.12.1        # Audio I/O
+httpx==0.25.2            # HTTP client to main API
+python-multipart==0.0.6
