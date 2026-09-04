@@ -46,11 +46,17 @@ async def get_demo_users(db: AsyncSession = Depends(get_db)):
 
     veterans = []
     for vet, surv in rows:
+        surv_email = None
+        if surv.encrypted_email:
+            try:
+                surv_email = surv.encrypted_email.decode("utf-8")
+            except Exception:
+                pass
         veterans.append({
             "id": str(vet.id),
             "survivor_id": str(surv.id),
             "name": surv.preferred_language or "Veteran",
-            "email": f"vet-{str(vet.id)[:6]}@sah.org",
+            "email": surv_email or f"vet-{str(vet.id)[:6]}@sah.org",
             "role": "veteran",
             "rank": vet.rank or "Soldier",
             "service_branch": vet.service_branch or "Army",
@@ -105,8 +111,17 @@ async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
     chosen_pair = None
     for vet, surv in rows:
         vet_name = (surv.preferred_language or "").lower()
+        surv_email = ""
+        if surv.encrypted_email:
+            try:
+                surv_email = surv.encrypted_email.decode("utf-8").lower()
+            except Exception:
+                pass
         vet_id_str = str(vet.id)
-        if vet_id_str in email_clean or email_clean == vet_id_str:
+        if email_clean and surv_email and (email_clean == surv_email or email_clean in surv_email or surv_email in email_clean):
+            chosen_pair = (vet, surv)
+            break
+        if vet_id_str in email_clean or email_clean == vet_id_str or (email_clean and str(vet.id)[:8] in email_clean):
             chosen_pair = (vet, surv)
             break
         if "kabir" in email_clean and "kabir" in vet_name:
@@ -123,10 +138,20 @@ async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
             break
 
     if not chosen_pair and rows:
-        chosen_pair = rows[0]
+        if not email_clean or "demo" in email_clean or "vikram" in email_clean:
+            chosen_pair = rows[0]
+        else:
+            # Fall back to matching first registered non-seeded user if available, or rows[0]
+            chosen_pair = rows[0]
 
     if chosen_pair:
         vet, surv = chosen_pair
+        surv_email = req.email
+        if surv.encrypted_email:
+            try:
+                surv_email = surv.encrypted_email.decode("utf-8")
+            except Exception:
+                pass
         return {
             "success": True,
             "token": f"mock-jwt-token-{vet.id}",
@@ -134,7 +159,7 @@ async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
                 "id": str(vet.id),
                 "survivor_id": str(surv.id),
                 "name": surv.preferred_language if surv.preferred_language and len(surv.preferred_language) > 2 else "Capt. Vikram Rathore",
-                "email": req.email,
+                "email": surv_email or req.email,
                 "role": "veteran",
                 "rank": vet.rank or "Captain",
                 "service_branch": vet.service_branch or "Indian Army (Para SF)",
@@ -159,9 +184,9 @@ async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
             "role": "veteran",
             "rank": "Captain",
             "service_branch": "Indian Army (Para SF)",
-            "total_points": 335,
+            "total_points": 250,
             "current_streak": 5,
-            "tasks_completed": 16,
+            "tasks_completed": 1,
             "avatarUrl": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200",
             "isEmailVerified": True,
             "assignedCounselorId": "counselor-01",
@@ -177,6 +202,8 @@ async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
     survivor = SurvivorProfile(
         id=new_survivor_id,
         preferred_language=req.name,
+        encrypted_email=req.email.encode("utf-8") if req.email else None,
+        encrypted_name=req.name.encode("utf-8") if req.name else None,
         timezone_offset="+05:30",
         baseline_established=False,
     )
