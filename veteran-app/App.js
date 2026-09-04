@@ -300,6 +300,21 @@ export default function App() {
     setUser(null);
   };
 
+  const updatePoints = async (pointsToAdd) => {
+    if (!user) return;
+    const newTotal = (user.total_points || 0) + pointsToAdd;
+    const updatedUser = {
+      ...user,
+      total_points: newTotal,
+    };
+    try {
+      await storage.set('user', JSON.stringify(updatedUser));
+    } catch (e) {
+      console.warn('storage updatePoints error:', e);
+    }
+    setUser(updatedUser);
+  };
+
   if (loading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.cream[200] }}>
@@ -309,7 +324,7 @@ export default function App() {
   }
 
   return (
-    <AuthContext.Provider value={{ user, setUser, login, logout, register }}>
+    <AuthContext.Provider value={{ user, setUser, login, logout, register, updatePoints }}>
       <NavigationContainer>
         <StatusBar style="light" />
         {user ? <MainStack /> : <AuthStack />}

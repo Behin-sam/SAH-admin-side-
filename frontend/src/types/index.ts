@@ -60,6 +60,7 @@ export interface Task {
   moodImpact?: string;
   notes?: string;
   isCustomCounselorAssigned?: boolean;
+  gpsRequired?: boolean;
 }
 
 export interface DailyMetrics {

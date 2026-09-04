@@ -28,7 +28,6 @@ export const Sidebar: React.FC = () => {
 
   const veteranNav = [
     { id: 'home', label: "Today's Journey", icon: Home },
-    { id: 'assessment', label: 'Initial Assessment', icon: ClipboardList },
     { id: 'profile-view', label: 'Recovery Profile', icon: UserCheck },
     { id: 'physical', label: 'Physical Well-being', icon: Activity },
     { id: 'mental', label: 'Mental Well-being', icon: Heart },

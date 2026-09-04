@@ -23,7 +23,7 @@ import { theme } from '../constants/theme';
 import { groupAPI } from '../services/api';
 
 const GroupsScreen = ({ navigation }) => {
-  const { user } = useAuth();
+  const { user, updatePoints } = useAuth();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -138,6 +138,9 @@ const GroupsScreen = ({ navigation }) => {
         if (user?.id) {
           await groupAPI.joinGroup(group.id, user.id);
         }
+        if (updatePoints) {
+          await updatePoints(15);
+        }
       } catch (err) {
         console.warn('Join group api fallback:', err);
       }
@@ -147,10 +150,11 @@ const GroupsScreen = ({ navigation }) => {
           g.id === group.id ? { ...g, member_count: (g.member_count || 0) + 1 } : g
         )
       );
+      const joinMsg = `You are now a member of ${group.name}.\n\n+15 Valor Points awarded! 🎉`;
       if (Platform.OS === 'web') {
-        window.alert(`Squad Joined! 🤝\n\nYou are now a member of ${group.name}.`);
+        window.alert(`Squad Joined! 🤝\n\n${joinMsg}`);
       } else {
-        Alert.alert('Squad Joined! 🤝', `You are now a member of ${group.name}.`);
+        Alert.alert('Squad Joined! 🤝', joinMsg);
       }
       setActionGroupId(null);
     };

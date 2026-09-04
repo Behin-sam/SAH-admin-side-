@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, VeteranProfile, Task, DailyMetrics, CheckInSurvey, AIInsight, NotificationItem, CounselorNote, UserRole, TaskStatus } from '../types';
-import { CURRENT_COUNSELOR, DEMO_VETERANS, INITIAL_TASKS_VET_1, INITIAL_TASKS_VET_3, MOCK_AI_INSIGHTS, MOCK_NOTIFICATIONS, MOCK_COUNSELOR_NOTES, generate30DayMetrics } from '../data/mockData';
+import { CURRENT_COUNSELOR, DEMO_VETERANS, INITIAL_TASKS_VET_1, INITIAL_TASKS_VET_3, NEW_USER_STARTER_TASKS, MOCK_AI_INSIGHTS, MOCK_NOTIFICATIONS, MOCK_COUNSELOR_NOTES, generate30DayMetrics } from '../data/mockData';
 import { apiService } from '../services/api';
 
 interface AppContextType {
@@ -168,13 +168,99 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   // Auth Methods
-  const loginWithCredentials = (email: string, role: UserRole) => {
+  const loginWithCredentials = async (email: string, role: UserRole) => {
     if (role === 'counselor') {
+      try {
+        const res = await apiService.login(email, 'counselor');
+        if (res?.user) {
+          setCurrentUser(res.user);
+          setCurrentRole('counselor');
+          setIsAuthenticated(true);
+          setActiveScreen('dashboard-overview');
+          return;
+        }
+      } catch (e) {
+        console.warn('Counselor login fallback:', e);
+      }
       setCurrentUser(CURRENT_COUNSELOR);
       setCurrentRole('counselor');
       setIsAuthenticated(true);
       setActiveScreen('dashboard-overview');
     } else {
+      try {
+        const res = await apiService.login(email, 'veteran');
+        if (res?.user) {
+          const u = res.user;
+          const userObj: User = {
+            id: u.id,
+            name: u.name,
+            rank: u.rank || 'Soldier',
+            unit: u.unit || 'Infantry Division',
+            role: 'veteran',
+            avatarUrl: u.avatarUrl || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200',
+            email: u.email || email,
+            isEmailVerified: true,
+            assignedCounselorId: u.assignedCounselorId || 'counselor-01',
+            assignedCounselorName: u.assignedCounselorName || 'Dr. Ananya Nair',
+            serviceBranch: u.service_branch || 'Indian Army',
+          };
+          const profObj: VeteranProfile = {
+            veteranId: u.id,
+            serviceBranch: u.service_branch || 'Indian Army',
+            yearsOfService: 10,
+            physicalActivityLevel: 'Moderate',
+            socialInteractionLevel: 'Moderate',
+            sleepConsistencyLevel: 'Moderate',
+            outdoorEngagementLevel: 'High',
+            routineStabilityLevel: 'Moderate',
+            recommendedFocus: ['Establish daily routine', 'Gradual outdoor walking', 'Connect with counselor'],
+            checkInFrequencyDays: 7,
+            streakDays: u.current_streak || 1,
+            totalXP: u.total_points || 50,
+            level: Math.floor((u.total_points || 50) / 300) + 1,
+            badges: [{ id: 'b-member', title: 'Active Member', description: 'VALOR Veteran Recovery', iconName: 'Shield', unlockedAt: '2026-09-05' }],
+            currentRiskLevel: 'NORMAL',
+          };
+
+          setAllVeterans(prev => {
+            const exists = prev.some(v => v.user.id === u.id);
+            return exists ? prev.map(v => v.user.id === u.id ? { user: userObj, profile: profObj } : v) : [...prev, { user: userObj, profile: profObj }];
+          });
+
+          setCurrentUser(userObj);
+          setActiveVeteranId(u.id);
+          setCurrentRole('veteran');
+          setIsAuthenticated(true);
+          setActiveScreen('home');
+
+          // Load live tasks from backend
+          try {
+            const dash = await apiService.getVeteranDashboard(u.id);
+            if (dash?.today_tasks?.length) {
+              const liveTasks: Task[] = dash.today_tasks.map((t: any) => ({
+                id: t.id,
+                title: t.title,
+                description: t.description,
+                category: t.type === 'physical' ? 'Physical' : t.type === 'social' ? 'Social' : 'Mental',
+                difficulty: 'Moderate',
+                xpReward: t.points,
+                status: t.status === 'completed' ? 'completed' : 'pending',
+                targetMetric: t.type,
+                targetValue: 1,
+                currentValue: t.status === 'completed' ? 1 : 0,
+                unit: 'session',
+                gpsRequired: t.gps_required,
+              }));
+              setTasksMap(prev => ({ ...prev, [u.id]: liveTasks }));
+            }
+          } catch (e) {}
+          return;
+        }
+      } catch (err) {
+        console.warn('Backend login fallback:', err);
+      }
+
+      // Fallback to local match if backend offline
       const match = allVeterans.find(v => v.user.email.toLowerCase() === email.toLowerCase()) || allVeterans[0];
       setCurrentUser(match.user);
       setCurrentRole('veteran');
@@ -184,12 +270,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const registerNewUser = (userData: Omit<User, 'id' | 'avatarUrl' | 'isEmailVerified'>) => {
-    const newId = `vet-${Date.now()}`;
+  const registerNewUser = async (userData: Omit<User, 'id' | 'avatarUrl' | 'isEmailVerified'>) => {
+    let newId = `vet-${Date.now()}`;
+    let registeredUser: any = null;
+
+    try {
+      const res = await apiService.register({
+        name: userData.name,
+        email: userData.email,
+        role: userData.role,
+        rank: userData.rank,
+        unit: userData.unit,
+        service_branch: userData.serviceBranch,
+      });
+      if (res?.user) {
+        registeredUser = res.user;
+        newId = res.user.id;
+      }
+    } catch (err) {
+      console.warn('Backend register fallback:', err);
+    }
+
     const newUser: User = {
       ...userData,
       id: newId,
-      avatarUrl: `https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200`,
+      avatarUrl: registeredUser?.avatarUrl || `https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200`,
       isEmailVerified: false,
       assignedCounselorId: 'counselor-01',
       assignedCounselorName: 'Dr. Ananya Nair'
@@ -207,16 +312,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       recommendedFocus: ['Establish daily routine', 'Gradual outdoor walking', 'Connect with counselor'],
       checkInFrequencyDays: 7,
       streakDays: 1,
-      totalXP: 100,
+      totalXP: registeredUser?.total_points || 50,
       level: 1,
       currentRiskLevel: 'NORMAL',
-      badges: [{ id: 'b-new', title: 'Registered Member', description: 'Joined VALOR Recovery Network', iconName: 'Shield', unlockedAt: '2026-09-04' }]
+      badges: [{ id: 'b-new', title: 'Registered Member', description: 'Joined VALOR Recovery Network', iconName: 'Shield', unlockedAt: '2026-09-05' }]
     };
 
     setAllVeterans(prev => [...prev, { user: newUser, profile: newProfile }]);
-    setTasksMap(prev => ({ ...prev, [newId]: INITIAL_TASKS_VET_1 }));
+    // Always assign fresh pending tasks (0 completed!)
+    setTasksMap(prev => ({ ...prev, [newId]: NEW_USER_STARTER_TASKS }));
     setCurrentUser(newUser);
     setActiveVeteranId(newId);
+
+    // If backend registered, sync backend tasks
+    if (registeredUser) {
+      try {
+        const dash = await apiService.getVeteranDashboard(newId);
+        if (dash?.today_tasks?.length) {
+          const liveTasks: Task[] = dash.today_tasks.map((t: any) => ({
+            id: t.id,
+            title: t.title,
+            description: t.description,
+            category: t.type === 'physical' ? 'Physical' : t.type === 'social' ? 'Social' : 'Mental',
+            difficulty: 'Moderate',
+            xpReward: t.points,
+            status: t.status === 'completed' ? 'completed' : 'pending',
+            targetMetric: t.type,
+            targetValue: 1,
+            currentValue: t.status === 'completed' ? 1 : 0,
+            unit: 'session',
+            gpsRequired: t.gps_required,
+          }));
+          setTasksMap(prev => ({ ...prev, [newId]: liveTasks }));
+        }
+      } catch (e) {}
+    }
   };
 
   const verifyEmailCode = (email: string, code: string): boolean => {
@@ -226,7 +356,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setIsAuthenticated(true);
         setCurrentRole(currentUser.role);
         if (currentUser.role === 'veteran') {
-          setActiveScreen('assessment');
+          setActiveScreen('home');
         } else {
           setActiveScreen('dashboard-overview');
         }

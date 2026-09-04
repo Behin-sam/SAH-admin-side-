@@ -36,7 +36,7 @@ const GROUNDING_PROMPTS = [
 ];
 
 const GPSTrackingScreen = ({ route, navigation }) => {
-  const { user, setUser } = useAuth();
+  const { user, setUser, updatePoints } = useAuth();
   const { taskId, task } = route.params || {};
 
   const targetDistanceMeters = task?.gps_target_distance_meters || 1000;
@@ -281,7 +281,9 @@ const GPSTrackingScreen = ({ route, navigation }) => {
     }
 
     // Update user points in AuthContext
-    if (user && setUser) {
+    if (updatePoints) {
+      await updatePoints(pointsToAdd);
+    } else if (user && setUser) {
       setUser({
         ...user,
         total_points: (user.total_points || 250) + pointsToAdd,

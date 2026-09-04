@@ -127,6 +127,60 @@ export const DEMO_VETERANS: { user: User; profile: VeteranProfile }[] = [
   }
 ];
 
+export const NEW_USER_STARTER_TASKS: Task[] = [
+  {
+    id: 'starter-assessment',
+    title: 'Starter Task: Initial Clinical Intake & Baseline Assessment',
+    category: 'Mental',
+    description: 'Complete your introductory 5-question clinical trauma assessment to personalize your recovery plan.',
+    durationMinutes: 5,
+    xpReward: 50,
+    recommendedTime: 'Anytime',
+    status: 'pending',
+  },
+  {
+    id: 't-starter-01',
+    title: '5-4-3-2-1 Sensory Grounding',
+    category: 'Mental',
+    description: 'Name 5 things you see, 4 touch, 3 hear, 2 smell, 1 taste to steady your nervous system.',
+    durationMinutes: 10,
+    xpReward: 15,
+    recommendedTime: 'Morning',
+    status: 'pending',
+  },
+  {
+    id: 't-starter-02',
+    title: '2km Tactical Endurance Walk',
+    category: 'Physical',
+    description: 'Engage in a steady 2km outdoor brisk walk to stimulate dopamine and rebuild stamina.',
+    durationMinutes: 25,
+    xpReward: 30,
+    recommendedTime: 'Morning',
+    status: 'pending',
+    gpsRequired: true,
+  },
+  {
+    id: 't-starter-03',
+    title: 'Hydration & Electrolyte Protocol',
+    category: 'Physical',
+    description: 'Maintain steady water intake (2L) throughout the day to support physical recovery.',
+    durationMinutes: 5,
+    xpReward: 10,
+    recommendedTime: 'Afternoon',
+    status: 'pending',
+  },
+  {
+    id: 't-starter-04',
+    title: 'Evening Gratitude & Reflection',
+    category: 'Routine',
+    description: 'Write down 3 moments of calm or achievement before sleeping.',
+    durationMinutes: 10,
+    xpReward: 15,
+    recommendedTime: 'Evening',
+    status: 'pending',
+  },
+];
+
 export const INITIAL_TASKS_VET_1: Task[] = [
   {
     id: 't-101',

@@ -120,7 +120,7 @@ const DEFAULT_FIVE_TASKS = [
 ];
 
 const DashboardScreen = ({ navigation }) => {
-  const { user, setUser, logout } = useAuth();
+  const { user, setUser, logout, updatePoints } = useAuth();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [dashboardData, setDashboardData] = useState(null);
@@ -273,7 +273,9 @@ const DashboardScreen = ({ navigation }) => {
         };
       });
 
-      if (user && setUser) {
+      if (updatePoints) {
+        await updatePoints(task.points || 15);
+      } else if (user && setUser) {
         setUser({
           ...user,
           total_points: (user.total_points || 250) + (task.points || 15),

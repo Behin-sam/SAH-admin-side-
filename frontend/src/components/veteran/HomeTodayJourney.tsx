@@ -147,8 +147,16 @@ export const HomeTodayJourney: React.FC = () => {
                       {!isCompleted && !isSkipped && (
                         <button
                           onClick={() => {
-                            setTaskToComplete(task);
-                            setIsCompletionModalOpen(true);
+                            if (
+                              task.id === 'starter-assessment' ||
+                              task.title.toLowerCase().includes('assessment') ||
+                              task.title.toLowerCase().includes('clinical intake')
+                            ) {
+                              setActiveScreen('assessment');
+                            } else {
+                              setTaskToComplete(task);
+                              setIsCompletionModalOpen(true);
+                            }
                           }}
                           className={`px-4 py-1.5 rounded-lg text-xs font-bold text-white transition-all shadow-sm ${
                             isRustButton
@@ -156,7 +164,11 @@ export const HomeTodayJourney: React.FC = () => {
                               : 'bg-[#1C1917] hover:bg-black'
                           }`}
                         >
-                          {isRustButton ? 'Check in' : 'Start'}
+                          {task.id === 'starter-assessment' || task.title.toLowerCase().includes('assessment')
+                            ? 'Start Assessment'
+                            : isRustButton
+                            ? 'Check in'
+                            : 'Start'}
                         </button>
                       )}
                       {isCompleted && (

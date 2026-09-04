@@ -16,3 +16,4 @@ node_modules/
 dist/
 *.db
 *.sqlite3
+!sah_local.db

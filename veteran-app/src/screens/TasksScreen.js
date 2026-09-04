@@ -12,6 +12,8 @@ import {
   TouchableOpacity,
   RefreshControl,
   ActivityIndicator,
+  Alert,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../App';
@@ -19,7 +21,7 @@ import { theme } from '../constants/theme';
 import { taskAPI } from '../services/api';
 
 const TasksScreen = ({ navigation }) => {
-  const { user } = useAuth();
+  const { user, updatePoints } = useAuth();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState('all');
@@ -62,7 +64,7 @@ const TasksScreen = ({ navigation }) => {
           title: '5-4-3-2-1 Grounding Technique',
           description: 'Practice the 5-4-3-2-1 senses check during anxiety, tension, or combat flashbacks.',
           points: 15,
-          status: 'completed',
+          status: 'assigned',
           difficulty: 1,
           category: 'grounding',
           gps_required: false,
@@ -117,6 +119,33 @@ const TasksScreen = ({ navigation }) => {
     } finally {
       setLoading(false);
       setRefreshing(false);
+    }
+  };
+
+  const handleQuickComplete = async (task) => {
+    if (task.status === 'completed') return;
+    if (task.gps_required) {
+      navigation.navigate('GPSTracking', { taskId: task.id, task });
+      return;
+    }
+    const pts = task.points || 15;
+    try {
+      if (user?.id) {
+        await taskAPI.completeTask(user.id, task.id).catch(() => {});
+      }
+      if (updatePoints) {
+        await updatePoints(pts);
+      }
+      setTasks((prev) =>
+        prev.map((t) => (t.id === task.id ? { ...t, status: 'completed' } : t))
+      );
+      if (Platform.OS === 'web') {
+        window.alert(`Task Completed! 🎉\n\n+${pts} Valor Points awarded!`);
+      } else {
+        Alert.alert('Task Completed! 🎉', `+${pts} Valor Points awarded!`);
+      }
+    } catch (e) {
+      console.warn('Quick complete error:', e);
     }
   };
 
@@ -272,7 +301,32 @@ const TasksScreen = ({ navigation }) => {
                 </View>
               </View>
 
-              <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+              {task.status !== 'completed' ? (
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: task.gps_required ? '#2563eb' : theme.colors.rust[500],
+                    paddingHorizontal: 10,
+                    paddingVertical: 6,
+                    borderRadius: 8,
+                    marginLeft: 8,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                  }}
+                  onPress={(e) => {
+                    e?.stopPropagation?.();
+                    handleQuickComplete(task);
+                  }}
+                >
+                  <Ionicons name={task.gps_required ? "navigate" : "checkmark"} size={14} color="#fff" />
+                  <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700', marginLeft: 3 }}>
+                    {task.gps_required ? 'Track' : 'Done'}
+                  </Text>
+                </TouchableOpacity>
+              ) : (
+                <View style={{ marginLeft: 8, alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name="checkmark-circle" size={22} color="#16a34a" />
+                </View>
+              )}
             </TouchableOpacity>
           ))
         )}

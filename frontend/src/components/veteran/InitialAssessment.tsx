@@ -3,7 +3,7 @@ import { ClipboardList, ArrowRight, ArrowLeft, CheckCircle2 } from 'lucide-react
 import { useApp } from '../../context/AppContext';
 
 export const InitialAssessment: React.FC = () => {
-  const { setActiveScreen } = useApp();
+  const { setActiveScreen, completeTask, tasks } = useApp();
   const [currentStep, setCurrentStep] = useState(0);
 
   const [formData, setFormData] = useState({
@@ -83,6 +83,14 @@ export const InitialAssessment: React.FC = () => {
     if (currentStep < questions.length - 1) {
       setCurrentStep(prev => prev + 1);
     } else {
+      const starterTask = tasks.find(
+        t => t.id === 'starter-assessment' ||
+             t.title.toLowerCase().includes('assessment') ||
+             t.title.toLowerCase().includes('clinical intake')
+      );
+      if (starterTask && starterTask.status !== 'completed') {
+        completeTask(starterTask.id, 2, 'Grounded', 'Completed initial clinical intake');
+      }
       setActiveScreen('home');
     }
   };

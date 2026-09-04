@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models import SurvivorProfile
-from app.models.gamified import VeteranProfile
+from app.models.gamified import VeteranProfile, DailyTask, TaskStatus, TaskType
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -196,6 +196,77 @@ async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
             tasks_completed=0,
         )
         db.add(veteran)
+
+        now = datetime.now(timezone.utc)
+        starter_tasks = [
+            DailyTask(
+                veteran_id=new_vet_id,
+                title="Starter Task: Initial Clinical Intake & Baseline Assessment",
+                description="Complete your introductory Harvard Trauma clinical baseline questionnaire to personalize your recovery plan.",
+                instructions="Answer the 5 core trauma questions honestly. This sets your clinical baseline and alerts your counselor if support is needed.",
+                task_type=TaskType.MENTAL,
+                category="assessment",
+                points=50,
+                difficulty=1,
+                status=TaskStatus.ASSIGNED,
+                assigned_date=now,
+                gps_required=False,
+            ),
+            DailyTask(
+                veteran_id=new_vet_id,
+                title="5-4-3-2-1 Grounding Technique",
+                description="Practice the 5-4-3-2-1 senses check during tension or flashbacks to anchor yourself in the present.",
+                instructions="Name 5 things you see, 4 touch, 3 hear, 2 smell, 1 taste. Take 3 deep breaths.",
+                task_type=TaskType.MENTAL,
+                category="grounding",
+                points=15,
+                difficulty=1,
+                status=TaskStatus.ASSIGNED,
+                assigned_date=now,
+                gps_required=False,
+            ),
+            DailyTask(
+                veteran_id=new_vet_id,
+                title="2km Tactical Walk",
+                description="Engage in a steady 2km outdoor brisk walk to stimulate dopamine, rebuild stamina, and ground your senses.",
+                instructions="Keep a steady rhythmic pace. Tap Start GPS Walk and verify your 2km trail.",
+                task_type=TaskType.PHYSICAL,
+                category="endurance",
+                points=30,
+                difficulty=2,
+                status=TaskStatus.ASSIGNED,
+                assigned_date=now,
+                gps_required=True,
+                gps_target_distance_meters=2000,
+            ),
+            DailyTask(
+                veteran_id=new_vet_id,
+                title="Hydration & Electrolyte Protocol",
+                description="Drink at least 2 liters of water and maintain electrolytes throughout the day to support nervous system recovery.",
+                instructions="Begin your morning with a large glass of water. Track regular hydration across the day.",
+                task_type=TaskType.PHYSICAL,
+                category="wellness",
+                points=10,
+                difficulty=1,
+                status=TaskStatus.ASSIGNED,
+                assigned_date=now,
+                gps_required=False,
+            ),
+            DailyTask(
+                veteran_id=new_vet_id,
+                title="Evening Gratitude & Reflection",
+                description="Write down three moments of pride or safety from today before sleeping.",
+                instructions="Identify 3 specific moments. Note how your body felt during them.",
+                task_type=TaskType.MENTAL,
+                category="reflection",
+                points=15,
+                difficulty=1,
+                status=TaskStatus.ASSIGNED,
+                assigned_date=now,
+                gps_required=False,
+            ),
+        ]
+        db.add_all(starter_tasks)
         await db.commit()
         await db.refresh(veteran)
 
@@ -210,8 +281,13 @@ async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
                 "rank": req.rank or "Soldier",
                 "service_branch": req.service_branch or "Army",
                 "unit": req.unit or "Infantry Division",
+                "total_points": veteran.total_points,
+                "current_streak": veteran.current_streak,
+                "tasks_completed": veteran.tasks_completed,
                 "avatarUrl": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200",
                 "isEmailVerified": True,
+                "assignedCounselorId": "counselor-01",
+                "assignedCounselorName": "Dr. Ananya Nair",
             },
         }
 

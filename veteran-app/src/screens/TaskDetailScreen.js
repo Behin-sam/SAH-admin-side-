@@ -12,12 +12,16 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
+import { useAuth } from '../../App';
+import { taskAPI } from '../services/api';
 
 const TaskDetailScreen = ({ route, navigation }) => {
   const { taskId, task } = route.params || {};
+  const { user, updatePoints } = useAuth();
   const [loading, setLoading] = useState(false);
   const [tracking, setTracking] = useState(false);
   const [location, setLocation] = useState(null);
@@ -97,14 +101,31 @@ const TaskDetailScreen = ({ route, navigation }) => {
     }
   };
 
-  const handleComplete = () => {
-    Alert.alert(
-      'Complete Task',
-      `You earned ${taskData.points} points! 🎉`,
-      [
-        { text: 'OK', onPress: () => navigation.goBack() },
-      ]
-    );
+  const handleComplete = async () => {
+    setLoading(true);
+    const pts = taskData.points || 15;
+    try {
+      if (user?.id && taskData.id) {
+        await taskAPI.completeTask(user.id, taskData.id).catch(() => {});
+      }
+      if (updatePoints) {
+        await updatePoints(pts);
+      }
+    } catch (e) {
+      console.warn('Task complete error:', e);
+    } finally {
+      setLoading(false);
+    }
+
+    const msg = `+${pts} Valor Points awarded! Great job staying committed.`;
+    if (Platform.OS === 'web') {
+      window.alert(`Task Completed! 🎉\n\n${msg}`);
+      navigation.goBack();
+    } else {
+      Alert.alert('Task Completed! 🎉', msg, [
+        { text: 'Awesome', onPress: () => navigation.goBack() },
+      ]);
+    }
   };
 
   const getDifficultyLabel = (difficulty) => {
