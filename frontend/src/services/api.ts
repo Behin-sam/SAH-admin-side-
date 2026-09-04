@@ -73,6 +73,13 @@ export const apiService = {
     });
   },
 
+  async submitAssessment(veteranId: string, answers: { question_id?: number; value: number }[]) {
+    return request<any>(`/veterans/${veteranId}/assessment`, {
+      method: 'POST',
+      body: JSON.stringify(answers),
+    });
+  },
+
   async skipTask(veteranId: string, taskId: string, reason?: string) {
     const query = reason ? `?reason=${encodeURIComponent(reason)}` : '';
     return request<any>(`/veterans/${veteranId}/tasks/${taskId}/skip${query}`, {
