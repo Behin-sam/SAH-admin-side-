@@ -137,6 +137,15 @@ function MainStack() {
         }}
       />
       <Stack.Screen
+        name="Assessment"
+        component={AssessmentScreen}
+        options={{
+          title: 'Daily Wellness Check-In',
+          headerStyle: { backgroundColor: theme.colors.cream[200], borderBottomColor: theme.colors.cream[400], borderBottomWidth: 1 },
+          headerTintColor: theme.colors.espresso[900],
+        }}
+      />
+      <Stack.Screen
         name="Admin"
         component={AdminScreen}
         options={{
@@ -172,32 +181,119 @@ export default function App() {
     } catch (e) { /* no stored auth */ } finally { setLoading(false); }
   };
 
-  const login = async (email, password, role = 'veteran') => {
+  const login = async (email, password, role = 'veteran', customUser = null) => {
+    if (customUser) {
+      await storage.set('user', JSON.stringify(customUser));
+      setUser(customUser);
+      return { success: true, user: customUser };
+    }
     try {
       const res = await authAPI.login(email, password, role);
       if (res?.user) {
         await storage.set('user', JSON.stringify(res.user));
         setUser(res.user);
-        return { success: true };
+        return { success: true, user: res.user };
       }
     } catch (e) {
       console.warn('Backend login fallback:', e);
     }
+    // Mock user fallback based on email/role
+    let mockUser;
+    const emailLower = (email || '').toLowerCase();
+    if (role === 'counselor' || emailLower.includes('nair') || emailLower.includes('counselor')) {
+      mockUser = {
+        id: 'counselor-01',
+        name: 'Dr. Ananya Nair',
+        email: email || 'a.nair@amrita-health.org',
+        role: 'counselor',
+        rank: 'Clinical Lead',
+        service_branch: 'Trauma & Wellness Specialist',
+        total_points: 999,
+        current_streak: 30,
+        tasks_completed: 150,
+        isEmailVerified: true,
+      };
+    } else if (emailLower.includes('kabir')) {
+      mockUser = {
+        id: '550e8400-e29b-41d4-a716-446655440002',
+        name: 'Maj. Kabir Singh',
+        email: email || 'kabir.singh@iaf.gov.in',
+        role: 'veteran',
+        rank: 'Major',
+        service_branch: 'Indian Air Force',
+        total_points: 420,
+        current_streak: 12,
+        tasks_completed: 24,
+        isEmailVerified: true,
+      };
+    } else if (emailLower.includes('arjun')) {
+      mockUser = {
+        id: '550e8400-e29b-41d4-a716-446655440003',
+        name: 'Sub. Arjun Das',
+        email: email || 'arjun.das@navy.gov.in',
+        role: 'veteran',
+        rank: 'Subedar',
+        service_branch: 'Indian Navy (MARCOS)',
+        total_points: 180,
+        current_streak: 3,
+        tasks_completed: 8,
+        isEmailVerified: true,
+      };
+    } else {
+      mockUser = {
+        id: '550e8400-e29b-41d4-a716-446655440001',
+        name: 'Capt. Vikram Rathore',
+        email: email || 'vikram.rathore@para.mod.gov.in',
+        role: 'veteran',
+        rank: 'Captain',
+        service_branch: 'Indian Army (Para SF)',
+        total_points: 335,
+        current_streak: 5,
+        tasks_completed: 16,
+        isEmailVerified: true,
+      };
+    }
+    await storage.set('user', JSON.stringify(mockUser));
+    setUser(mockUser);
+    return { success: true, user: mockUser };
+  };
+
+  const register = async (userData) => {
+    try {
+      const res = await authAPI.register(userData);
+      if (res?.user) {
+        await storage.set('user', JSON.stringify(res.user));
+        setUser(res.user);
+        return { success: true, user: res.user };
+      }
+    } catch (e) {
+      console.warn('Backend register fallback:', e);
+    }
     const mockUser = {
-      id: '550e8400-e29b-41d4-a716-446655440001',
-      name: 'Capt. Vikram Rathore',
-      email,
-      service_branch: 'Indian Army (Para SF)',
-      rank: 'Captain',
-      total_points: 250,
-      current_streak: 5,
+      id: `vet-${Date.now()}`,
+      name: userData.name || 'Veteran Soldier',
+      email: userData.email,
+      role: userData.role || 'veteran',
+      rank: userData.rank || 'Soldier',
+      service_branch: userData.service_branch || userData.serviceBranch || 'Indian Army',
+      total_points: 50,
+      current_streak: 1,
+      tasks_completed: 0,
+      isEmailVerified: true,
     };
     await storage.set('user', JSON.stringify(mockUser));
     setUser(mockUser);
-    return { success: true };
+    return { success: true, user: mockUser };
   };
 
-  const logout = async () => { await storage.remove('user'); setUser(null); };
+  const logout = async () => {
+    try {
+      await storage.remove('user');
+    } catch (e) {
+      console.warn('Logout storage remove failed:', e);
+    }
+    setUser(null);
+  };
 
   if (loading) {
     return (
@@ -208,7 +304,7 @@ export default function App() {
   }
 
   return (
-    <AuthContext.Provider value={{ user, login, logout }}>
+    <AuthContext.Provider value={{ user, setUser, login, logout, register }}>
       <NavigationContainer>
         <StatusBar style="light" />
         {user ? <MainStack /> : <AuthStack />}

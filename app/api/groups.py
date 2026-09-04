@@ -194,22 +194,26 @@ async def join_group(
     if group.member_count >= group.max_members:
         raise HTTPException(status_code=400, detail="Group is full")
 
-    # Check if already a member
+    # Check if existing membership record exists
     result = await db.execute(
         select(GroupMembership).where(
             GroupMembership.group_id == group_id,
             GroupMembership.veteran_id == veteran_id,
-            GroupMembership.is_active == True,
         )
     )
-    if result.scalar_one_or_none():
-        raise HTTPException(status_code=409, detail="Already a member")
-
-    membership = GroupMembership(
-        group_id=group_id,
-        veteran_id=veteran_id,
-    )
-    db.add(membership)
+    existing_membership = result.scalar_one_or_none()
+    if existing_membership:
+        if existing_membership.is_active:
+            raise HTTPException(status_code=409, detail="Already a member")
+        # Reactivate existing membership
+        existing_membership.is_active = True
+        existing_membership.joined_at = datetime.now(timezone.utc)
+    else:
+        membership = GroupMembership(
+            group_id=group_id,
+            veteran_id=veteran_id,
+        )
+        db.add(membership)
 
     group.member_count += 1
 

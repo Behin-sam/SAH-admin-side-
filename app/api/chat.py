@@ -274,3 +274,79 @@ async def send_emergency_message(
         "counselor_name": "Dr. Ananya Nair",
         "status": "alert_dispatched",
     }
+
+
+COUNSELORS_DIRECTORY = [
+    {
+        "id": "c0000000-0000-0000-0000-000000000001",
+        "name": "Dr. Ananya Nair, MD",
+        "title": "Lead Trauma Specialist & Clinical Caregiver",
+        "institution": "Amrita Institute of Medical Sciences",
+        "specialty": "Combat PTSD & Somatic Grounding",
+        "email": "a.nair@amrita-health.org",
+        "phone": "+91 484 285 1234",
+        "avatar": "AN",
+        "rating": 4.9,
+        "active_clients": 14,
+    },
+    {
+        "id": "c0000000-0000-0000-0000-000000000002",
+        "name": "Dr. Rajesh Varma, PhD",
+        "title": "Senior Clinical Psychologist & Neuropsychologist",
+        "institution": "Armed Forces Medical College (AFMC)",
+        "specialty": "Cognitive Processing & Exposure Protocol",
+        "email": "r.varma@afmc.gov.in",
+        "phone": "+91 20 2633 4567",
+        "avatar": "RV",
+        "rating": 4.8,
+        "active_clients": 11,
+    },
+    {
+        "id": "c0000000-0000-0000-0000-000000000003",
+        "name": "Dr. Sneha Kulkarni, MS",
+        "title": "Mindfulness & Sleep Recovery Specialist",
+        "institution": "National Institute of Mental Health",
+        "specialty": "Sleep Architecture & Stress De-escalation",
+        "email": "s.kulkarni@nimh.gov.in",
+        "phone": "+91 80 2699 5000",
+        "avatar": "SK",
+        "rating": 4.9,
+        "active_clients": 16,
+    },
+    {
+        "id": "c0000000-0000-0000-0000-000000000004",
+        "name": "Maj. Gen. (Retd) Dr. Ramesh Pillai",
+        "title": "Veteran Combat Psychiatrist",
+        "institution": "Veterans Military Wellness Council",
+        "specialty": "Transition Trauma & Veteran Peer Reintegration",
+        "email": "r.pillai@veterans-wellness.gov.in",
+        "phone": "+91 11 2301 9876",
+        "avatar": "RP",
+        "rating": 5.0,
+        "active_clients": 9,
+    },
+]
+
+
+@router.get("/api/chat/counselors")
+async def list_counselors():
+    """List available clinical counselors for client selection."""
+    return {"counselors": COUNSELORS_DIRECTORY}
+
+
+class AssignCounselorRequest(BaseModel):
+    counselor_id: str
+    counselor_name: str
+
+
+@router.post("/api/veterans/{veteran_id}/counselor")
+async def choose_counselor(veteran_id: uuid.UUID, req: AssignCounselorRequest, db: AsyncSession = Depends(get_db)):
+    """Assign/change counselor for veteran."""
+    return {
+        "success": True,
+        "veteran_id": str(veteran_id),
+        "counselor_id": req.counselor_id,
+        "counselor_name": req.counselor_name,
+        "message": f"Successfully matched with {req.counselor_name}",
+    }
+

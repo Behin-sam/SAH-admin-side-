@@ -226,6 +226,10 @@ export const chatAPI = {
   // List counselors
   listCounselors: () => api.get('/chat/counselors'),
 
+  // Choose / change assigned counselor
+  chooseCounselor: (veteranId, counselorId, counselorName) =>
+    api.post(`/veterans/${veteranId}/counselor`, { counselor_id: counselorId, counselor_name: counselorName }),
+
   // List conversations
   listConversations: (veteranId) => api.get('/chat/conversations', { params: { veteran_id: veteranId } }),
 
@@ -238,6 +242,19 @@ export const authAPI = {
   login: (email, password, role = 'veteran') => api.post('/auth/login', { email, password, role }),
   register: (data) => api.post('/auth/register', data),
   getDemoUsers: () => api.get('/auth/demo-users'),
+};
+
+export const gpsAPI = {
+  recordPoint: (veteranId, pointData) =>
+    api.post(`/veterans/${veteranId}/gps/track`, null, { params: pointData }),
+  recordBatch: (veteranId, points, taskId = null) =>
+    api.post(`/veterans/${veteranId}/gps/track/batch`, { points, task_id: taskId }),
+  getTaskTrack: (veteranId, taskId) =>
+    api.get(`/veterans/${veteranId}/gps/track/${taskId}`),
+  getHistory: (veteranId) =>
+    api.get(`/veterans/${veteranId}/gps/history`),
+  getStats: (veteranId) =>
+    api.get(`/veterans/${veteranId}/gps/stats`),
 };
 
 export default api;

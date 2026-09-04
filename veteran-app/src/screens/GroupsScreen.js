@@ -15,6 +15,7 @@ import {
   RefreshControl,
   ActivityIndicator,
   Alert,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../App';
@@ -131,68 +132,91 @@ const GroupsScreen = ({ navigation }) => {
   };
 
   const handleJoinGroup = async (group) => {
-    Alert.alert(
-      'Join Squad',
-      `Join ${group.name} and participate in shared recovery activities?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Join Squad',
-          onPress: async () => {
-            setActionGroupId(group.id);
-            try {
-              if (user?.id) {
-                await groupAPI.joinGroup(group.id, user.id);
-              }
-              setMyGroups((prev) => [...prev, { ...group, role: 'member' }]);
-              setGroups((prev) =>
-                prev.map((g) =>
-                  g.id === group.id ? { ...g, member_count: g.member_count + 1 } : g
-                )
-              );
-              Alert.alert('Squad Joined! 🤝', `You are now a member of ${group.name}.`);
-            } catch (err) {
-              setMyGroups((prev) => [...prev, { ...group, role: 'member' }]);
-              Alert.alert('Squad Joined! 🤝', `You joined ${group.name}!`);
-            } finally {
-              setActionGroupId(null);
-            }
-          },
-        },
-      ]
-    );
+    const doJoin = async () => {
+      setActionGroupId(group.id);
+      try {
+        if (user?.id) {
+          await groupAPI.joinGroup(group.id, user.id);
+        }
+      } catch (err) {
+        console.warn('Join group api fallback:', err);
+      }
+      setMyGroups((prev) => [...prev, { ...group, role: 'member' }]);
+      setGroups((prev) =>
+        prev.map((g) =>
+          g.id === group.id ? { ...g, member_count: (g.member_count || 0) + 1 } : g
+        )
+      );
+      if (Platform.OS === 'web') {
+        window.alert(`Squad Joined! 🤝\n\nYou are now a member of ${group.name}.`);
+      } else {
+        Alert.alert('Squad Joined! 🤝', `You are now a member of ${group.name}.`);
+      }
+      setActionGroupId(null);
+    };
+
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && window.confirm) {
+        if (window.confirm(`Join ${group.name} and participate in shared recovery activities?`)) {
+          await doJoin();
+        }
+      } else {
+        await doJoin();
+      }
+    } else {
+      Alert.alert(
+        'Join Squad',
+        `Join ${group.name} and participate in shared recovery activities?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Join Squad', onPress: doJoin },
+        ]
+      );
+    }
   };
 
   const handleLeaveGroup = async (group) => {
-    Alert.alert(
-      'Leave Squad',
-      `Are you sure you want to leave ${group.name}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Leave Squad',
-          style: 'destructive',
-          onPress: async () => {
-            setActionGroupId(group.id);
-            try {
-              if (user?.id) {
-                await groupAPI.leaveGroup(group.id, user.id);
-              }
-              setMyGroups((prev) => prev.filter((g) => g.id !== group.id));
-              setGroups((prev) =>
-                prev.map((g) =>
-                  g.id === group.id ? { ...g, member_count: Math.max(0, g.member_count - 1) } : g
-                )
-              );
-            } catch {
-              setMyGroups((prev) => prev.filter((g) => g.id !== group.id));
-            } finally {
-              setActionGroupId(null);
-            }
-          },
-        },
-      ]
-    );
+    const doLeave = async () => {
+      setActionGroupId(group.id);
+      try {
+        if (user?.id) {
+          await groupAPI.leaveGroup(group.id, user.id);
+        }
+      } catch (err) {
+        console.warn('Leave group api fallback:', err);
+      }
+      setMyGroups((prev) => prev.filter((g) => g.id !== group.id));
+      setGroups((prev) =>
+        prev.map((g) =>
+          g.id === group.id ? { ...g, member_count: Math.max(0, (g.member_count || 1) - 1) } : g
+        )
+      );
+      if (Platform.OS === 'web') {
+        window.alert(`You left ${group.name}.`);
+      } else {
+        Alert.alert('Squad Left', `You left ${group.name}.`);
+      }
+      setActionGroupId(null);
+    };
+
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && window.confirm) {
+        if (window.confirm(`Are you sure you want to leave ${group.name}?`)) {
+          await doLeave();
+        }
+      } else {
+        await doLeave();
+      }
+    } else {
+      Alert.alert(
+        'Leave Squad',
+        `Are you sure you want to leave ${group.name}?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Leave Squad', style: 'destructive', onPress: doLeave },
+        ]
+      );
+    }
   };
 
   const filteredGroups = groups.filter(group =>

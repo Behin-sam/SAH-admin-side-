@@ -65,7 +65,7 @@ export const SplashWelcome: React.FC = () => {
           <button
             onClick={() => {
               setRole('veteran');
-              setActiveScreen('assessment');
+              setActiveScreen('home');
             }}
             className="w-full sm:w-auto px-8 py-4 rounded-xl bg-[#D96B27] hover:bg-[#C55A1A] text-white font-extrabold text-xs shadow-rust flex items-center justify-center gap-3 transition-all group font-heading tracking-wider"
           >

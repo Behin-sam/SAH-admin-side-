@@ -1,6 +1,6 @@
 /**
  * Profile Screen
- * Shows veteran profile, settings, stats, and logout with VALOR design system
+ * Shows veteran profile, settings, stats, counselor choice, and logout with VALOR design system
  */
 
 import React, { useState } from 'react';
@@ -12,39 +12,100 @@ import {
   TouchableOpacity,
   Alert,
   Switch,
+  Platform,
+  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../App';
 import { theme } from '../constants/theme';
+import { COUNSELORS_LIST } from './DashboardScreen';
+import { chatAPI } from '../services/api';
+import { storage } from '../services/storage';
 
 const ProfileScreen = ({ navigation }) => {
-  const { user, logout } = useAuth();
+  const { user, setUser, logout } = useAuth();
   const [gpsEnabled, setGpsEnabled] = useState(true);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [counselorModalVisible, setCounselorModalVisible] = useState(false);
 
   const handleLogout = () => {
-    Alert.alert(
-      'Sign Out',
-      'Are you sure you want to sign out of your account?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Sign Out', style: 'destructive', onPress: () => logout() },
-      ]
-    );
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && window.confirm) {
+        if (window.confirm('Are you sure you want to sign out of your account?')) {
+          logout();
+        }
+      } else {
+        logout();
+      }
+    } else {
+      Alert.alert(
+        'Sign Out',
+        'Are you sure you want to sign out of your account?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Sign Out', style: 'destructive', onPress: () => logout() },
+        ]
+      );
+    }
   };
+
+  const handleSelectCounselor = async (counselor) => {
+    try {
+      if (user?.id) {
+        await chatAPI.chooseCounselor(user.id, counselor.id, counselor.name).catch(() => {});
+      }
+    } catch (e) {
+      console.warn('Counselor select api fallback:', e);
+    }
+
+    const updated = {
+      ...user,
+      assignedCounselorId: counselor.id,
+      assignedCounselorName: counselor.name,
+      assignedCounselorTitle: counselor.title,
+      assignedCounselorSpecialty: counselor.specialty,
+    };
+    if (setUser) setUser(updated);
+    try {
+      await storage.set('user', JSON.stringify(updated));
+    } catch (e) {}
+
+    setCounselorModalVisible(false);
+    if (Platform.OS === 'web') {
+      window.alert(`Assigned to ${counselor.name}!\n\nYour clinical channel is now linked to ${counselor.institution}.`);
+    } else {
+      Alert.alert('Counselor Assigned! 🩺', `Your clinical channel is now linked to ${counselor.name}.`);
+    }
+  };
+
+  const assignedCounselor = user?.assignedCounselorName || 'Dr. Ananya Nair, MD';
 
   const menuItems = [
     {
       icon: 'chatbubbles',
       title: 'Clinical Counselor Chat',
-      subtitle: 'Confidential channel with Dr. Ananya Nair',
-      onPress: () => navigation.navigate('Chat', { counselorName: 'Dr. Ananya Nair' }),
+      subtitle: `Channel with ${assignedCounselor}`,
+      onPress: () => navigation.navigate('Chat', { counselorName: assignedCounselor }),
       color: theme.colors.rust[500],
+    },
+    {
+      icon: 'medical',
+      title: 'Choose Clinical Counselor',
+      subtitle: `${assignedCounselor} • Tap to change`,
+      onPress: () => setCounselorModalVisible(true),
+      color: '#0D9488',
+    },
+    {
+      icon: 'clipboard',
+      title: 'Daily 5-Questionnaire Check-In',
+      subtitle: 'Harvard Trauma clinical protocol • +20 Valor Points',
+      onPress: () => navigation.navigate('Assessment'),
+      color: theme.colors.rust[600],
     },
     {
       icon: 'person',
       title: 'Service Profile',
-      subtitle: 'Branch, deployment, and personal record',
+      subtitle: `${user?.service_branch || 'Army'} • ${user?.rank || 'Captain'}`,
       onPress: () => Alert.alert('Service Profile', `${user?.name || 'Veteran'} | ${user?.service_branch || 'Army'} (${user?.rank || 'Captain'})`),
     },
     {
@@ -80,16 +141,10 @@ const ProfileScreen = ({ navigation }) => {
       onPress: () => Alert.alert('Privacy Protection', 'All assessment and GPS logs are end-to-end protected and strictly confidential.'),
     },
     {
-      icon: 'help-circle',
-      title: 'Clinical Support Desk',
-      subtitle: 'Assistance with recovery schedules',
-      onPress: () => Alert.alert('Support Desk', 'Contact clinical ops: support@sah-recovery.org'),
-    },
-    {
       icon: 'information-circle',
       title: 'About VALOR Protocol',
-      subtitle: 'Version 2.0 (Full Integration)',
-      onPress: () => Alert.alert('VALOR Protocol', 'Integrated Web & Mobile Veteran Recovery System'),
+      subtitle: 'Version 2.0 (Integrated Web & Mobile)',
+      onPress: () => Alert.alert('VALOR Protocol', 'Integrated Web & Mobile Veteran Recovery System with Harvard Trauma Questionnaire Protocol.'),
     },
   ];
 
@@ -103,9 +158,6 @@ const ProfileScreen = ({ navigation }) => {
               {user?.name ? user.name.charAt(0) : 'V'}
             </Text>
           </View>
-          <TouchableOpacity style={styles.editAvatarButton} onPress={() => Alert.alert('Photo', 'Profile photo update coming soon.')}>
-            <Ionicons name="camera" size={14} color="#fff" />
-          </TouchableOpacity>
         </View>
 
         <Text style={styles.userName}>{user?.name || 'Capt. Vikram Rathore'}</Text>
@@ -159,16 +211,6 @@ const ProfileScreen = ({ navigation }) => {
         ))}
       </View>
 
-      {/* Counselor Dashboard Direct Link */}
-      <TouchableOpacity
-        style={styles.counselorButton}
-        onPress={() => Alert.alert('Clinical Portal', 'Clinical dashboard is active on the Web portal at http://localhost:3000')}
-      >
-        <Ionicons name="medical" size={20} color={theme.colors.rust[500]} />
-        <Text style={styles.counselorButtonText}>Clinical Provider Sync (Live)</Text>
-        <Ionicons name="checkmark-circle" size={18} color={theme.colors.status.stable} />
-      </TouchableOpacity>
-
       {/* Logout Button */}
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
         <Ionicons name="log-out-outline" size={20} color={theme.colors.status.urgent} />
@@ -180,6 +222,65 @@ const ProfileScreen = ({ navigation }) => {
         <Text style={styles.footerText}>SAH Veteran Recovery Network</Text>
         <Text style={styles.footerSub}>VALOR Protocol • Secure Client v2.0</Text>
       </View>
+
+      {/* COUNSELOR SELECTION MODAL */}
+      <Modal
+        visible={counselorModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setCounselorModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.modalOverline}>CLINICAL DIRECTORY</Text>
+                <Text style={styles.modalTitle}>Choose Your Counselor</Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setCounselorModalVisible(false)}
+                style={styles.modalCloseBtn}
+              >
+                <Ionicons name="close" size={22} color={theme.colors.espresso[700]} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ maxHeight: 400 }}>
+              {COUNSELORS_LIST.map((c) => {
+                const isSelected = assignedCounselor.includes(c.name.split(' ')[1]);
+                return (
+                  <TouchableOpacity
+                    key={c.id}
+                    style={[styles.counselorOptionCard, isSelected && styles.counselorOptionActive]}
+                    onPress={() => handleSelectCounselor(c)}
+                    activeOpacity={0.8}
+                  >
+                    <View style={styles.counselorOptionAvatar}>
+                      <Text style={styles.counselorOptionAvatarText}>{c.avatar}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Text style={styles.counselorOptionName}>{c.name}</Text>
+                        <Text style={styles.ratingText}>⭐ {c.rating}</Text>
+                      </View>
+                      <Text style={styles.counselorOptionTitle}>{c.title}</Text>
+                      <Text style={styles.counselorOptionInst}>{c.institution}</Text>
+                      <Text style={styles.counselorOptionSpec}>Focus: {c.specialty}</Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            <TouchableOpacity
+              style={styles.modalCancelBtn}
+              onPress={() => setCounselorModalVisible(false)}
+            >
+              <Text style={styles.modalCancelText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 };
@@ -190,86 +291,71 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.cream[200],
   },
   scrollContent: {
-    paddingBottom: 110,
+    padding: 16,
+    paddingBottom: 40,
   },
   header: {
-    backgroundColor: theme.colors.espresso[900],
-    padding: 24,
-    paddingTop: 30,
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
     alignItems: 'center',
-    ...theme.shadows.warmMd,
+    paddingVertical: 24,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: theme.colors.cream[400],
+    marginBottom: 16,
+    ...theme.shadows.sm,
   },
   avatarContainer: {
     position: 'relative',
-    marginBottom: 14,
+    marginBottom: 12,
   },
   avatar: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
-    backgroundColor: theme.colors.rust[500],
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: theme.colors.espresso[900],
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 3,
-    borderColor: theme.colors.cream[50],
+    borderColor: theme.colors.rust[500],
   },
   avatarText: {
-    fontSize: 34,
+    fontSize: 28,
     fontWeight: '900',
     color: '#fff',
   },
-  editAvatarButton: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: theme.colors.espresso[800],
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: theme.colors.cream[50],
-  },
   userName: {
-    fontSize: 22,
-    fontWeight: '900',
-    color: theme.colors.cream[50],
-    marginBottom: 4,
-    letterSpacing: -0.5,
+    fontSize: 20,
+    fontWeight: '800',
+    color: theme.colors.espresso[900],
+    marginBottom: 2,
   },
   userEmail: {
-    fontSize: 14,
-    color: theme.colors.cream[300],
-    marginBottom: 12,
+    fontSize: 13,
+    color: theme.colors.espresso[500],
+    marginBottom: 10,
   },
   serviceBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    backgroundColor: theme.colors.espresso[900],
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 20,
   },
   serviceText: {
-    fontSize: 13,
-    color: theme.colors.cream[50],
+    fontSize: 11,
     fontWeight: '700',
+    color: theme.colors.peach[200],
   },
   statsContainer: {
     flexDirection: 'row',
-    backgroundColor: theme.colors.cream[50],
-    marginHorizontal: 16,
-    marginTop: -20,
-    borderRadius: 16,
-    paddingVertical: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 16,
     borderWidth: 1,
     borderColor: theme.colors.cream[400],
-    ...theme.shadows.warmMd,
+    marginBottom: 16,
+    ...theme.shadows.sm,
   },
   statItem: {
     flex: 1,
@@ -277,30 +363,29 @@ const styles = StyleSheet.create({
   },
   statValue: {
     fontSize: 18,
-    fontWeight: '900',
+    fontWeight: '800',
     color: theme.colors.espresso[900],
   },
   statLabel: {
     fontSize: 11,
-    color: theme.colors.espresso[400],
+    color: theme.colors.espresso[500],
     marginTop: 2,
     fontWeight: '600',
   },
   statDivider: {
     width: 1,
-    height: '70%',
-    backgroundColor: theme.colors.cream[300],
+    height: '80%',
+    backgroundColor: theme.colors.cream[400],
     alignSelf: 'center',
   },
   menuContainer: {
-    backgroundColor: theme.colors.cream[50],
-    borderRadius: 16,
-    marginHorizontal: 16,
-    marginTop: 18,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: theme.colors.cream[400],
     overflow: 'hidden',
-    ...theme.shadows.warm,
+    marginBottom: 16,
+    ...theme.shadows.sm,
   },
   menuItem: {
     flexDirection: 'row',
@@ -315,7 +400,7 @@ const styles = StyleSheet.create({
   menuIcon: {
     width: 40,
     height: 40,
-    borderRadius: 10,
+    borderRadius: 12,
     backgroundColor: theme.colors.cream[200],
     justifyContent: 'center',
     alignItems: 'center',
@@ -325,66 +410,144 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   menuTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
     color: theme.colors.espresso[900],
   },
   menuSubtitle: {
-    fontSize: 12,
-    color: theme.colors.espresso[400],
+    fontSize: 11,
+    color: theme.colors.espresso[500],
     marginTop: 2,
-  },
-  counselorButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.colors.peach[100],
-    marginHorizontal: 16,
-    marginTop: 14,
-    padding: 16,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: theme.colors.peach[300],
-    ...theme.shadows.warm,
-  },
-  counselorButtonText: {
-    flex: 1,
-    marginLeft: 12,
-    fontSize: 14,
-    fontWeight: '800',
-    color: theme.colors.rust[700],
   },
   logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: theme.colors.cream[50],
-    marginHorizontal: 16,
-    marginTop: 14,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
     padding: 16,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#FECACA',
-    ...theme.shadows.warm,
+    borderWidth: 1.5,
+    borderColor: theme.colors.status.urgent,
+    marginBottom: 20,
+    gap: 8,
   },
   logoutButtonText: {
-    marginLeft: 8,
+    color: theme.colors.status.urgent,
     fontSize: 15,
     fontWeight: '800',
-    color: theme.colors.status.urgent,
   },
   footer: {
     alignItems: 'center',
-    marginTop: 24,
+    paddingVertical: 10,
   },
   footerText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
     color: theme.colors.espresso[700],
   },
   footerSub: {
-    fontSize: 11,
+    fontSize: 10,
     color: theme.colors.espresso[400],
     marginTop: 2,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    padding: 20,
+    paddingBottom: 36,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalOverline: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: theme.colors.espresso[400],
+    letterSpacing: 1.2,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: theme.colors.espresso[900],
+    marginTop: 2,
+  },
+  modalCloseBtn: {
+    padding: 4,
+  },
+  counselorOptionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.cream[100],
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: theme.colors.cream[400],
+    padding: 12,
+    marginBottom: 10,
+  },
+  counselorOptionActive: {
+    backgroundColor: theme.colors.peach[100],
+    borderColor: theme.colors.rust[500],
+  },
+  counselorOptionAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: theme.colors.rust[500],
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  counselorOptionAvatarText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  counselorOptionName: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: theme.colors.espresso[900],
+  },
+  ratingText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#D97706',
+  },
+  counselorOptionTitle: {
+    fontSize: 11,
+    color: theme.colors.rust[600],
+    fontWeight: '700',
+    marginTop: 1,
+  },
+  counselorOptionInst: {
+    fontSize: 11,
+    color: theme.colors.espresso[600],
+    marginTop: 1,
+  },
+  counselorOptionSpec: {
+    fontSize: 10,
+    color: theme.colors.espresso[400],
+    marginTop: 2,
+  },
+  modalCancelBtn: {
+    backgroundColor: theme.colors.espresso[900],
+    borderRadius: 14,
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  modalCancelText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
   },
 });
 

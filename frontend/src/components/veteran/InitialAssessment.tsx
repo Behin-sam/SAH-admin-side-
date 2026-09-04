@@ -83,7 +83,7 @@ export const InitialAssessment: React.FC = () => {
     if (currentStep < questions.length - 1) {
       setCurrentStep(prev => prev + 1);
     } else {
-      setActiveScreen('profile-view');
+      setActiveScreen('home');
     }
   };
 

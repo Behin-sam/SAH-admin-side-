@@ -54,14 +54,13 @@ const TasksScreen = ({ navigation }) => {
           console.warn('Live task fetch fallback:', apiErr.message);
         }
       }
-      // Mock data for demo
+      // 5 Curated daily recovery tasks
       const mockTasks = [
-        // Mental / Psychological
         {
           id: '1',
           type: 'mental',
           title: '5-4-3-2-1 Grounding Technique',
-          description: 'Practice the 5-4-3-2-1 senses check during anxiety or flashbacks.',
+          description: 'Practice the 5-4-3-2-1 senses check during anxiety, tension, or combat flashbacks.',
           points: 15,
           status: 'completed',
           difficulty: 1,
@@ -70,109 +69,51 @@ const TasksScreen = ({ navigation }) => {
         },
         {
           id: '2',
-          type: 'mental',
-          title: 'Cognitive Reframing Exercise',
-          description: 'Challenge a negative thought pattern by writing it down and reframing it.',
-          points: 20,
-          status: 'in_progress',
-          difficulty: 2,
-          category: 'cognitive',
-          gps_required: false,
-        },
-        {
-          id: '3',
-          type: 'mental',
-          title: 'Mindfulness Meditation (10 min)',
-          description: 'Spend 10 minutes in mindfulness meditation, focusing on your breath.',
-          points: 20,
-          status: 'assigned',
-          difficulty: 2,
-          category: 'mindfulness',
-          gps_required: false,
-        },
-        {
-          id: '4',
-          type: 'mental',
-          title: 'Daily Mood & Trigger Journal',
-          description: 'Track your moods, triggers, and progress in a journal entry.',
-          points: 15,
-          status: 'assigned',
-          difficulty: 1,
-          category: 'journaling',
-          gps_required: false,
-        },
-        // Physical
-        {
-          id: '5',
           type: 'physical',
-          title: 'Brisk 30-Minute Walk or Run',
-          description: 'Go for a brisk walk or run to boost endorphins and clear your mind.',
+          title: 'Brisk 30-Minute Grounding Walk',
+          description: 'Elevate heart rate and boost bilateral stimulation with GPS-verified movement.',
           points: 25,
           status: 'assigned',
           difficulty: 2,
           category: 'cardio',
           gps_required: true,
+          gps_target_distance_meters: 1000,
         },
         {
-          id: '6',
-          type: 'physical',
-          title: 'Yoga or Tai Chi Session',
-          description: 'Try yoga or tai chi for movement combined with breath control.',
+          id: '3',
+          type: 'mental',
+          title: 'Cognitive Reframing Journal',
+          description: 'Challenge a combat anxiety thought pattern by writing down a grounded perspective.',
           points: 20,
           status: 'assigned',
           difficulty: 2,
-          category: 'yoga',
+          category: 'cognitive',
           gps_required: false,
         },
         {
-          id: '7',
-          type: 'physical',
-          title: 'Gardening or Yard Work',
-          description: 'Do gardening or yard work as active, grounding movement.',
+          id: '4',
+          type: 'social',
+          title: 'Squad Community Peer Check-In',
+          description: 'Leave an encouraging word for your Morning Walkers recovery squad.',
           points: 15,
           status: 'assigned',
           difficulty: 1,
-          category: 'outdoor',
-          gps_required: false,
-        },
-        // Group / Peer
-        {
-          id: '8',
-          type: 'social',
-          title: 'VA / Vet Center Peer Support Group',
-          description: 'Join a VA or Vet Center PTSD peer support group.',
-          points: 30,
-          status: 'assigned',
-          difficulty: 2,
           category: 'peer_support',
           gps_required: false,
         },
         {
-          id: '9',
-          type: 'social',
-          title: 'Team RWB or Team Rubicon Event',
-          description: 'Attend a Team RWB or Team Rubicon community event.',
-          points: 30,
+          id: '5',
+          type: 'mental',
+          title: 'Box Breathing Sleep Protocol',
+          description: '4-4-4-4 diaphragmatic breathing session to calm sympathetic nervous tone before bed.',
+          points: 15,
           status: 'assigned',
-          difficulty: 2,
-          category: 'community',
-          gps_required: false,
-        },
-        {
-          id: '10',
-          type: 'social',
-          title: 'Veteran Team Sports League',
-          description: 'Participate in a team sports league with fellow veterans.',
-          points: 25,
-          status: 'assigned',
-          difficulty: 2,
-          category: 'team_sports',
+          difficulty: 1,
+          category: 'breathing',
           gps_required: false,
         },
       ];
       setTasks(mockTasks);
-    } catch (error) {
-      console.error('Error loading tasks:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -186,19 +127,16 @@ const TasksScreen = ({ navigation }) => {
 
   const filteredTasks = tasks.filter((task) => {
     if (activeFilter === 'all') return true;
-    if (activeFilter === 'mental') return task.type === 'mental';
-    if (activeFilter === 'physical') return task.type === 'physical';
-    if (activeFilter === 'social') return task.type === 'social';
     if (activeFilter === 'completed') return task.status === 'completed';
     if (activeFilter === 'pending') return task.status !== 'completed';
-    return true;
+    return task.type === activeFilter;
   });
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'completed': return '#10b981';
-      case 'in_progress': return '#f59e0b';
-      case 'assigned': return '#6b7280';
+  const getTypeColor = (type) => {
+    switch (type) {
+      case 'mental': return '#8b5cf6';
+      case 'physical': return theme.colors.rust[500];
+      case 'social': return '#3b82f6';
       default: return '#6b7280';
     }
   };
@@ -212,11 +150,11 @@ const TasksScreen = ({ navigation }) => {
     }
   };
 
-  const getTypeColor = (type) => {
-    switch (type) {
-      case 'mental': return '#8b5cf6';
-      case 'physical': return '#10b981';
-      case 'social': return '#3b82f6';
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'completed': return theme.colors.status.stable;
+      case 'in_progress': return '#3b82f6';
+      case 'assigned': return theme.colors.rust[500];
       default: return '#6b7280';
     }
   };
@@ -224,14 +162,14 @@ const TasksScreen = ({ navigation }) => {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#2563eb" />
+        <ActivityIndicator size="large" color={theme.colors.rust[500]} />
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      {/* Filter Tabs */}
+      {/* Filter Bar */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -257,6 +195,22 @@ const TasksScreen = ({ navigation }) => {
         style={styles.tasksList}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
+        {/* Daily 5-Questionnaire Banner */}
+        <TouchableOpacity
+          style={styles.checkInBanner}
+          onPress={() => navigation.navigate('Assessment')}
+          activeOpacity={0.85}
+        >
+          <View style={styles.checkInIconWrap}>
+            <Ionicons name="clipboard" size={22} color={theme.colors.rust[500]} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.checkInBannerTitle}>Daily 5-Question Wellness Check-In</Text>
+            <Text style={styles.checkInBannerSub}>Harvard Trauma clinical protocol • +20 Valor Points</Text>
+          </View>
+          <Ionicons name="arrow-forward" size={16} color={theme.colors.rust[600]} />
+        </TouchableOpacity>
+
         {filteredTasks.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Ionicons name="checkbox-outline" size={64} color="#d1d5db" />
@@ -267,7 +221,13 @@ const TasksScreen = ({ navigation }) => {
             <TouchableOpacity
               key={task.id}
               style={styles.taskCard}
-              onPress={() => navigation.navigate('TaskDetail', { taskId: task.id, task })}
+              onPress={() => {
+                if (task.gps_required && task.status !== 'completed') {
+                  navigation.navigate('GPSTracking', { taskId: task.id, task });
+                } else {
+                  navigation.navigate('TaskDetail', { taskId: task.id, task });
+                }
+              }}
             >
               <View style={[styles.taskTypeIndicator, { backgroundColor: getTypeColor(task.type) }]} />
               
@@ -496,6 +456,40 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     marginLeft: 8,
+  },
+  checkInBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.rust[50],
+    borderWidth: 1.5,
+    borderColor: theme.colors.rust[200],
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 16,
+    ...theme.shadows.card,
+  },
+  checkInIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+    borderWidth: 1,
+    borderColor: theme.colors.rust[200],
+  },
+  checkInBannerTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: theme.colors.espresso[900],
+    letterSpacing: 0.2,
+  },
+  checkInBannerSub: {
+    fontSize: 11,
+    color: theme.colors.rust[700],
+    marginTop: 2,
+    fontWeight: '600',
   },
 });
 

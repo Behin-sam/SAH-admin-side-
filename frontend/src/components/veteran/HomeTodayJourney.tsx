@@ -83,19 +83,19 @@ export const HomeTodayJourney: React.FC = () => {
 
             <div className="space-y-1">
               <h2 className="font-heading text-xl font-bold text-[#1C1917]">
-                Finish your five-question setup.
+                Daily 5-Question Wellness Check-In
               </h2>
               <p className="text-xs text-[#786F68] leading-relaxed">
-                A few answers help keep each day personal and practical.
+                Harvard Trauma Protocol • Calibrate your daily recovery and earn +20 Valor Points.
               </p>
             </div>
           </div>
 
           <button
             onClick={() => setActiveScreen('assessment')}
-            className="w-full py-3 rounded-xl bg-[#D96B27] hover:bg-[#C55A1A] text-white font-bold text-xs flex items-center justify-center gap-2 shadow-rust transition-all"
+            className="w-full py-3 rounded-xl bg-[#D96B27] hover:bg-[#C55A1A] text-white font-bold text-xs flex items-center justify-center gap-2 shadow-rust transition-all font-heading tracking-wider"
           >
-            <span>Continue setup</span>
+            <span>Take Daily 5-Question Check-In</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>
