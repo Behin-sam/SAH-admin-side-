@@ -8,17 +8,17 @@ OpenAPI docs at: http://localhost:8000/docs
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import survivors, consent, checkins, counselor, sync
+from app.api import survivors, consent, checkins, counselor, sync, veterans, tasks, gps, groups, admin
 from app.database import engine, Base
 
 app = FastAPI(
     title="SAH — Trauma-Informed Support System",
     description=(
-        "AI-powered mental health distress-prediction backend for survivors. "
-        "This is a prototype/hackathon project — NOT a diagnostic or "
-        "surveillance system. All signals are opt-in and survivor-controlled."
+        "AI-powered mental health and wellness system for veterans. "
+        "Features daily tasks, GPS tracking, group activities, points system, "
+        "and admin analytics. All signals are opt-in and veteran-controlled. "
     ),
-    version="0.1.0",
+    version="0.2.0",
     docs_url="/docs",
     redoc_url="/redoc",
 )
@@ -39,6 +39,13 @@ app.include_router(checkins.router)
 app.include_router(counselor.router)
 app.include_router(sync.router)
 
+# Gamified veteran wellness routers
+app.include_router(veterans.router)
+app.include_router(tasks.router)
+app.include_router(gps.router)
+app.include_router(groups.router)
+app.include_router(admin.router)
+
 
 @app.on_event("startup")
 async def startup():
@@ -50,11 +57,17 @@ async def startup():
 @app.get("/")
 async def root():
     return {
-        "name": "SAH — Trauma-Informed Support System",
-        "version": "0.1.0",
+        "name": "SAH — Veteran Wellness System",
+        "version": "0.2.0",
         "status": "prototype",
+        "features": [
+            "Daily mental & physical tasks",
+            "GPS tracking for activities",
+            "Veteran groups & social activities",
+            "Points & rewards system",
+            "Admin dashboard & analytics",
+        ],
         "docs": "/docs",
-        "warning": "This is a hackathon prototype. NOT for clinical use.",
     }
 
 
