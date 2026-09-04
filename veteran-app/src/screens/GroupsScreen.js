@@ -631,7 +631,7 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '800',
     color: theme.colors.espresso[900],
-    fontFamily: theme.fonts.heading,
+    fontFamily: theme?.fonts?.heading || 'System',
   },
   headerActions: {
     flexDirection: 'row',

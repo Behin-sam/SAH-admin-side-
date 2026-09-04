@@ -26,6 +26,18 @@ export const storage = {
     }
   },
 
+  // getItem with auto JSON parse
+  getItem: async (key) => {
+    try {
+      const val = await AsyncStorage.getItem(key);
+      if (!val) return null;
+      try { return JSON.parse(val); } catch { return val; }
+    } catch (error) {
+      console.error('Storage getItem error:', error);
+      return null;
+    }
+  },
+
   // Generic set
   set: async (key, value) => {
     try {
@@ -37,6 +49,18 @@ export const storage = {
     }
   },
 
+  // setItem with auto JSON stringify
+  setItem: async (key, value) => {
+    try {
+      const strVal = typeof value === 'string' ? value : JSON.stringify(value);
+      await AsyncStorage.setItem(key, strVal);
+      return true;
+    } catch (error) {
+      console.error('Storage setItem error:', error);
+      return false;
+    }
+  },
+
   // Generic remove
   remove: async (key) => {
     try {
@@ -44,6 +68,16 @@ export const storage = {
       return true;
     } catch (error) {
       console.error('Storage remove error:', error);
+      return false;
+    }
+  },
+
+  removeItem: async (key) => {
+    try {
+      await AsyncStorage.removeItem(key);
+      return true;
+    } catch (error) {
+      console.error('Storage removeItem error:', error);
       return false;
     }
   },

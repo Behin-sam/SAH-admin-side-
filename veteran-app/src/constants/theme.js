@@ -3,7 +3,14 @@
  * Ported from shishi-88/SAH_Veteran_Recovery for unified design language
  */
 
+import { Platform } from 'react-native';
+
 export const theme = {
+  fonts: {
+    heading: Platform.OS === 'ios' ? 'System' : 'sans-serif',
+    body: Platform.OS === 'ios' ? 'System' : 'sans-serif',
+    mono: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
   colors: {
     // Warm Cream Canvas & Surfaces
     cream: {
