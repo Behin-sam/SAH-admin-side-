@@ -64,7 +64,12 @@ cp .env.example .env
 # 3. Run the server
 uvicorn app.main:app --reload --port 8000
 
-# 4. Open API docs
+# 4. Run the web frontend (VALOR Theme)
+cd frontend
+npm install
+npm run dev
+
+# 5. Open API docs
 # http://localhost:8000/docs
 ```
 
