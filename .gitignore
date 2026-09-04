@@ -11,3 +11,8 @@ venv/
 *.sqlite3
 .pytest_cache/
 .ruff_cache/
+node_modules/
+.expo/
+dist/
+*.db
+*.sqlite3
