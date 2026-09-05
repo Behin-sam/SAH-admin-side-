@@ -124,7 +124,67 @@ async def get_veteran_profile(veteran_id: uuid.UUID, db: AsyncSession = Depends(
         "tasks_completed": veteran.tasks_completed,
         "tasks_completed_today": tasks_today,
         "groups_joined": groups_count,
+        "deployment_count": veteran.deployment_count,
+        # Extended profile fields
+        "avatar_url": veteran.avatar_url,
+        "bio": veteran.bio,
+        "phone_number": veteran.phone_number,
+        "emergency_contact_name": veteran.emergency_contact_name,
+        "emergency_contact_phone": veteran.emergency_contact_phone,
+        "home_city": veteran.home_city,
         "created_at": veteran.created_at.isoformat(),
+    }
+
+
+class ProfileUpdateRequest(BaseModel := __import__('pydantic').BaseModel):
+    rank: str | None = None
+    service_branch: str | None = None
+    years_of_service: int | None = None
+    deployment_count: int | None = None
+    bio: str | None = None
+    avatar_url: str | None = None
+    phone_number: str | None = None
+    emergency_contact_name: str | None = None
+    emergency_contact_phone: str | None = None
+    home_city: str | None = None
+    gps_enabled: bool | None = None
+    notifications_enabled: bool | None = None
+
+
+@router.patch("/{veteran_id}/profile")
+async def update_veteran_profile(
+    veteran_id: uuid.UUID,
+    payload: ProfileUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Update extended veteran profile fields."""
+    result = await db.execute(select(VeteranProfile).where(VeteranProfile.id == veteran_id))
+    veteran = result.scalar_one_or_none()
+    if not veteran:
+        raise HTTPException(status_code=404, detail="Veteran not found")
+
+    fields = payload.model_dump(exclude_none=True)
+    for key, value in fields.items():
+        setattr(veteran, key, value)
+    veteran.updated_at = datetime.now(timezone.utc)
+    await db.flush()
+    await db.refresh(veteran)
+
+    return {
+        "id": str(veteran.id),
+        "rank": veteran.rank,
+        "service_branch": veteran.service_branch,
+        "years_of_service": veteran.years_of_service,
+        "deployment_count": veteran.deployment_count,
+        "bio": veteran.bio,
+        "avatar_url": veteran.avatar_url,
+        "phone_number": veteran.phone_number,
+        "emergency_contact_name": veteran.emergency_contact_name,
+        "emergency_contact_phone": veteran.emergency_contact_phone,
+        "home_city": veteran.home_city,
+        "gps_enabled": veteran.gps_enabled,
+        "notifications_enabled": veteran.notifications_enabled,
+        "updated_at": veteran.updated_at.isoformat(),
     }
 
 

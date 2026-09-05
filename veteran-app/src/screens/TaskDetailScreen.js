@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { useAuth } from '../../App';
 import { taskAPI } from '../services/api';
+import { storage } from '../services/storage';
 
 const TaskDetailScreen = ({ route, navigation }) => {
   const { taskId, task } = route.params || {};
@@ -26,6 +27,17 @@ const TaskDetailScreen = ({ route, navigation }) => {
   const [tracking, setTracking] = useState(false);
   const [location, setLocation] = useState(null);
   const [gpsPoints, setGpsPoints] = useState([]);
+  const [status, setStatus] = useState(task?.status || 'assigned');
+
+  // Check stored completion
+  useEffect(() => {
+    const checkDone = async () => {
+      const doneKey = `@sah_task_done_${taskId || task?.id}`;
+      const isDone = await storage.get(doneKey);
+      if (isDone) setStatus('completed');
+    };
+    checkDone();
+  }, [taskId, task]);
 
   // Use task from params or mock data
   const taskData = task || {
@@ -90,14 +102,12 @@ const TaskDetailScreen = ({ route, navigation }) => {
     if (taskData.gps_required) {
       navigation.navigate('GPSTracking', { taskId: taskData.id, task: taskData });
     } else {
-      Alert.alert(
-        'Start Task',
-        'Ready to begin this task?',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Start', onPress: () => console.log('Task started') },
-        ]
-      );
+      setStatus('in_progress');
+      if (Platform.OS === 'web') {
+        window.alert('Task Started! Follow the instructions above and press "Complete Task" when finished.');
+      } else {
+        Alert.alert('Task Started!', 'Follow the instructions above and press "Complete Task" when finished.');
+      }
     }
   };
 
@@ -110,6 +120,10 @@ const TaskDetailScreen = ({ route, navigation }) => {
       }
       if (updatePoints) {
         await updatePoints(pts);
+      }
+      setStatus('completed');
+      if (taskData.id) {
+        await storage.set(`@sah_task_done_${taskData.id}`, 'true');
       }
     } catch (e) {
       console.warn('Task complete error:', e);
@@ -219,7 +233,7 @@ const TaskDetailScreen = ({ route, navigation }) => {
 
       {/* Action Buttons */}
       <View style={styles.actionContainer}>
-        {taskData.status === 'assigned' && (
+        {status === 'assigned' && (
           <TouchableOpacity style={styles.startButton} onPress={handleStart}>
             <Ionicons name="play" size={24} color="#fff" />
             <Text style={styles.startButtonText}>
@@ -228,14 +242,14 @@ const TaskDetailScreen = ({ route, navigation }) => {
           </TouchableOpacity>
         )}
         
-        {taskData.status === 'in_progress' && (
+        {status === 'in_progress' && (
           <TouchableOpacity style={styles.completeButton} onPress={handleComplete}>
             <Ionicons name="checkmark-circle" size={24} color="#fff" />
             <Text style={styles.completeButtonText}>Complete Task</Text>
           </TouchableOpacity>
         )}
 
-        {taskData.status === 'completed' && (
+        {status === 'completed' && (
           <View style={styles.completedContainer}>
             <Ionicons name="checkmark-circle" size={48} color="#10b981" />
             <Text style={styles.completedText}>Task Completed!</Text>

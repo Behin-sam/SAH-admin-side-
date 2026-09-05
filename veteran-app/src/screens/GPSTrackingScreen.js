@@ -26,6 +26,7 @@ import * as Location from 'expo-location';
 import { useAuth } from '../../App';
 import { theme } from '../constants/theme';
 import { gpsAPI, taskAPI } from '../services/api';
+import { storage } from '../services/storage';
 
 const GROUNDING_PROMPTS = [
   '🍃 Deep breath: 4 seconds in through your nose, 4 seconds out.',
@@ -274,10 +275,13 @@ const GPSTrackingScreen = ({ route, navigation }) => {
         }
         if (taskId) {
           await taskAPI.completeTask(user.id, taskId).catch(() => {});
+          await storage.set(`@sah_task_done_${taskId}`, 'true');
         }
       } catch (err) {
         console.warn('GPS batch submit fallback:', err);
       }
+    } else if (taskId) {
+      await storage.set(`@sah_task_done_${taskId}`, 'true');
     }
 
     // Update user points in AuthContext

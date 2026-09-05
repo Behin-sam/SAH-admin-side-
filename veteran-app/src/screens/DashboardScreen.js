@@ -22,6 +22,7 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../App';
 import { theme } from '../constants/theme';
 import { veteranAPI, taskAPI, chatAPI } from '../services/api';
@@ -131,22 +132,34 @@ const DashboardScreen = ({ navigation }) => {
     loadDashboard();
   }, [user]);
 
+  useFocusEffect(
+    React.useCallback(() => {
+      loadDashboard();
+    }, [user])
+  );
+
   const loadDashboard = async () => {
     try {
       if (user?.id) {
         try {
           const liveData = await veteranAPI.getDashboard(user.id);
           if (liveData && liveData.stats) {
-            // Ensure exactly 5 tasks
-            const tasksList = (liveData.today_tasks && liveData.today_tasks.length >= 5)
+            const rawTasks = (liveData.today_tasks && liveData.today_tasks.length >= 5)
               ? liveData.today_tasks.slice(0, 5)
               : (liveData.today_tasks && liveData.today_tasks.length > 0)
                 ? [...liveData.today_tasks, ...DEFAULT_FIVE_TASKS.slice(liveData.today_tasks.length, 5)]
                 : DEFAULT_FIVE_TASKS;
 
+            const checkedTasks = await Promise.all(
+              rawTasks.map(async (t) => {
+                const isDone = await storage.get(`@sah_task_done_${t.id}`);
+                return isDone ? { ...t, status: 'completed' } : t;
+              })
+            );
+
             setDashboardData({
               ...liveData,
-              today_tasks: tasksList,
+              today_tasks: checkedTasks,
             });
             setLoading(false);
             setRefreshing(false);
@@ -157,16 +170,22 @@ const DashboardScreen = ({ navigation }) => {
         }
       }
 
-      // Fallback data with exactly 5 daily tasks
+      const checkedFallbackTasks = await Promise.all(
+        DEFAULT_FIVE_TASKS.map(async (t) => {
+          const isDone = await storage.get(`@sah_task_done_${t.id}`);
+          return isDone ? { ...t, status: 'completed' } : t;
+        })
+      );
+
       setDashboardData({
         greeting: getGreeting(),
         stats: {
           total_points: user?.total_points || 250,
           current_streak: user?.current_streak || 5,
           tasks_completed: user?.tasks_completed || 12,
-          pending_tasks: 4,
+          pending_tasks: checkedFallbackTasks.filter((t) => t.status !== 'completed').length,
         },
-        today_tasks: DEFAULT_FIVE_TASKS,
+        today_tasks: checkedFallbackTasks,
         groups: [
           {
             id: 'g1',
@@ -255,6 +274,7 @@ const DashboardScreen = ({ navigation }) => {
       if (user?.id) {
         await taskAPI.completeTask(user.id, task.id).catch(() => {});
       }
+      await storage.set(`@sah_task_done_${task.id}`, 'true');
 
       setDashboardData((prev) => {
         if (!prev) return prev;

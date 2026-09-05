@@ -54,6 +54,9 @@ export const veteranAPI = {
   // Submit wellness assessment
   submitAssessment: (id, answers) => api.post(`/veterans/${id}/assessment`, answers),
 
+  // Update veteran profile
+  updateProfile: (id, data) => api.patch(`/veterans/${id}/profile`, data),
+
   // Get dashboard
   getDashboard: (id) => api.get(`/veterans/${id}/dashboard`),
 
@@ -251,7 +254,11 @@ export const chatAPI = {
 
 export const friendsAPI = {
   getFriends: (veteranId) => api.get(`/veterans/${veteranId}/friends`),
-  addFriend: (veteranId, friendVeteranId) => api.post(`/veterans/${veteranId}/friends`, { friend_veteran_id: friendVeteranId }),
+  getFriendRequests: (veteranId) => api.get(`/veterans/${veteranId}/friend-requests`),
+  sendFriendRequest: (veteranId, friendVeteranId) =>
+    api.post(`/veterans/${veteranId}/friends`, { friend_veteran_id: friendVeteranId }),
+  respondToFriendRequest: (veteranId, requestId, action) =>
+    api.patch(`/veterans/${veteranId}/friend-requests/${requestId}`, { action }),
   removeFriend: (veteranId, friendId) => api.delete(`/veterans/${veteranId}/friends/${friendId}`),
   discoverVeterans: (veteranId, search = '') => api.get(`/veterans/${veteranId}/discover`, { params: { search } }),
   getDMThread: (veteranId, otherVeteranId) => api.get(`/veterans/${veteranId}/dm/${otherVeteranId}`),

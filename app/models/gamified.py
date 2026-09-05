@@ -88,6 +88,14 @@ class VeteranProfile(Base):
     tasks_completed = Column(Integer, default=0)
     groups_joined = Column(Integer, default=0)
 
+    # Extended profile fields
+    avatar_url = Column(Text, nullable=True)  # base64 data URI or URL
+    bio = Column(Text, nullable=True)  # Short personal bio / service summary
+    phone_number = Column(String(20), nullable=True)
+    emergency_contact_name = Column(String(100), nullable=True)
+    emergency_contact_phone = Column(String(20), nullable=True)
+    home_city = Column(String(100), nullable=True)
+
     # Timestamps
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc),

@@ -201,16 +201,34 @@ export const apiService = {
     return request<any>(`/groups/${groupId}/activities?${query}`, { method: 'POST' });
   },
 
+  async updateVeteranProfile(veteranId: string, data: any) {
+    return request<any>(`/veterans/${veteranId}/profile`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
   // ─── Friends & DM Endpoints ────────────────────────────────────────────────
 
   async getFriends(veteranId: string) {
     return request<{ veteran_id: string; friends: any[]; count: number }>(`/veterans/${veteranId}/friends`);
   },
 
-  async addFriend(veteranId: string, friendVeteranId: string) {
-    return request<{ message: string; points_earned: number }>(`/veterans/${veteranId}/friends`, {
+  async getFriendRequests(veteranId: string) {
+    return request<{ veteran_id: string; requests: any[]; count: number }>(`/veterans/${veteranId}/friend-requests`);
+  },
+
+  async sendFriendRequest(veteranId: string, friendVeteranId: string) {
+    return request<{ message: string; status: string; request_id?: string }>(`/veterans/${veteranId}/friends`, {
       method: 'POST',
       body: JSON.stringify({ friend_veteran_id: friendVeteranId }),
+    });
+  },
+
+  async respondToFriendRequest(veteranId: string, requestId: string, action: 'accept' | 'reject') {
+    return request<{ message: string; status: string }>(`/veterans/${veteranId}/friend-requests/${requestId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ action }),
     });
   },
 
@@ -238,7 +256,7 @@ export const apiService = {
   // Health check
   async checkHealth(): Promise<boolean> {
     try {
-      const res = await fetch('http://localhost:8000/health');
+      const res = await fetch('http://127.0.0.1:8001/health');
       return res.ok;
     } catch {
       return false;

@@ -16,9 +16,11 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../App';
 import { theme } from '../constants/theme';
 import { taskAPI } from '../services/api';
+import { storage } from '../services/storage';
 
 const TasksScreen = ({ navigation }) => {
   const { user, updatePoints } = useAuth();
@@ -31,23 +33,35 @@ const TasksScreen = ({ navigation }) => {
     loadTasks();
   }, [user]);
 
+  useFocusEffect(
+    React.useCallback(() => {
+      loadTasks();
+    }, [user])
+  );
+
   const loadTasks = async () => {
     try {
       if (user?.id) {
         try {
           const liveTasks = await taskAPI.getTasks(user.id);
           if (liveTasks && liveTasks.length > 0) {
-            setTasks(liveTasks.map(t => ({
-              id: t.id,
-              type: t.task_type || t.type,
-              title: t.title,
-              description: t.description,
-              points: t.points,
-              status: t.status,
-              difficulty: t.difficulty || 1,
-              category: t.category || 'wellness',
-              gps_required: t.gps_required,
-            })));
+            const mapped = await Promise.all(
+              liveTasks.map(async (t) => {
+                const isDone = await storage.get(`@sah_task_done_${t.id}`);
+                return {
+                  id: t.id,
+                  type: t.task_type || t.type,
+                  title: t.title,
+                  description: t.description,
+                  points: t.points,
+                  status: isDone ? 'completed' : t.status,
+                  difficulty: t.difficulty || 1,
+                  category: t.category || 'wellness',
+                  gps_required: t.gps_required,
+                };
+              })
+            );
+            setTasks(mapped);
             setLoading(false);
             setRefreshing(false);
             return;
@@ -115,7 +129,13 @@ const TasksScreen = ({ navigation }) => {
           gps_required: false,
         },
       ];
-      setTasks(mockTasks);
+      const checkedMockTasks = await Promise.all(
+        mockTasks.map(async (t) => {
+          const isDone = await storage.get(`@sah_task_done_${t.id}`);
+          return isDone ? { ...t, status: 'completed' } : t;
+        })
+      );
+      setTasks(checkedMockTasks);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -133,6 +153,7 @@ const TasksScreen = ({ navigation }) => {
       if (user?.id) {
         await taskAPI.completeTask(user.id, task.id).catch(() => {});
       }
+      await storage.set(`@sah_task_done_${task.id}`, 'true');
       if (updatePoints) {
         await updatePoints(pts);
       }
