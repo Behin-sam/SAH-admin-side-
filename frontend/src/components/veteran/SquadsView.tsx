@@ -120,7 +120,7 @@ export const SquadsView: React.FC = () => {
   const [completedActivities, setCompletedActivities] = useState<Record<string, boolean>>({});
   const [awardingMemberId, setAwardingMemberId] = useState<string | null>(null);
 
-  const vetId = activeVeteranId || currentUser?.id || 'vet-01';
+  const vetId = activeVeteranId || (currentUser?.id && currentUser.id.includes('-') ? currentUser.id : '550e8400-e29b-41d4-a716-446655440001');
 
   // Fetch groups list
   const loadGroups = useCallback(async () => {
