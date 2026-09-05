@@ -7,10 +7,10 @@ import axios from 'axios';
 import { Platform } from 'react-native';
 
 const API_BASE_URL = Platform.select({
-  web: 'http://localhost:8000/api',
-  ios: 'http://localhost:8000/api',
-  android: 'http://10.0.2.2:8000/api',
-  default: 'http://localhost:8000/api',
+  web: 'http://localhost:8001/api',
+  ios: 'http://localhost:8001/api',
+  android: 'http://10.0.2.2:8001/api',
+  default: 'http://localhost:8001/api',
 });
 
 const api = axios.create({
