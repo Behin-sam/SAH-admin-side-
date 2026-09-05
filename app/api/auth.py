@@ -242,11 +242,10 @@ async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
                 "unit": "9 Para Special Forces",
                 "total_points": vet.total_points,
                 "current_streak": vet.current_streak,
-                "tasks_completed": vet.tasks_completed,
                 "avatarUrl": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200",
                 "isEmailVerified": True,
-                "assignedCounselorId": "counselor-01",
-                "assignedCounselorName": "Dr. Ananya Nair",
+                "assignedCounselorId": str(vet.assigned_counselor_id) if vet.assigned_counselor_id else None,
+                "assignedCounselorName": vet.assigned_counselor_name,
             },
         }
 
@@ -389,8 +388,8 @@ async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
                 "tasks_completed": veteran.tasks_completed,
                 "avatarUrl": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200",
                 "isEmailVerified": True,
-                "assignedCounselorId": "counselor-01",
-                "assignedCounselorName": "Dr. Ananya Nair",
+                "assignedCounselorId": str(veteran.assigned_counselor_id) if veteran.assigned_counselor_id else None,
+                "assignedCounselorName": veteran.assigned_counselor_name,
             },
         }
 

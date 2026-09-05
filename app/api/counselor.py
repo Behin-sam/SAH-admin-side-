@@ -43,16 +43,51 @@ from app.security.access_control import verify_case_access
 router = APIRouter(prefix="/api/counselors/{counselor_id}", tags=["counselor"])
 
 
-async def _get_assigned_survivor_ids(db: AsyncSession, counselor_id: UUID) -> list[str]:
+async def _get_assigned_survivor_ids(db: AsyncSession, counselor_id: Any) -> list[str]:
     """Get all survivor IDs assigned to this counselor."""
-    result = await db.execute(
-        select(CounselorCaseAssignment.survivor_id)
-        .where(
-            CounselorCaseAssignment.counselor_id == str(counselor_id),
-            CounselorCaseAssignment.is_active == True,
+    c_uuid = None
+    try:
+        c_uuid = counselor_id if isinstance(counselor_id, UUID) else UUID(str(counselor_id))
+    except Exception:
+        pass
+
+    survivor_ids = set()
+
+    if c_uuid:
+        result = await db.execute(
+            select(CounselorCaseAssignment.survivor_id)
+            .where(
+                CounselorCaseAssignment.counselor_id == c_uuid,
+                CounselorCaseAssignment.is_active == True,
+            )
+        )
+        for row in result.all():
+            survivor_ids.add(str(row[0]))
+
+    # Also resolve directly from VeteranProfile
+    conditions = [
+        VeteranProfile.assigned_counselor_id == str(counselor_id),
+    ]
+    if c_uuid:
+        conditions.append(VeteranProfile.assigned_counselor_id == str(c_uuid))
+
+    c_res = await db.execute(
+        select(CounselorProfile).where(
+            (CounselorProfile.id == c_uuid) if c_uuid else False
         )
     )
-    return [str(row[0]) for row in result.all()]
+    counselor = c_res.scalars().first()
+    if counselor and counselor.name:
+        conditions.append(func.lower(VeteranProfile.assigned_counselor_name) == counselor.name.lower())
+
+    v_res = await db.execute(
+        select(VeteranProfile.survivor_id).where(or_(*conditions))
+    )
+    for row in v_res.all():
+        if row[0]:
+            survivor_ids.add(str(row[0]))
+
+    return list(survivor_ids)
 
 
 async def _get_latest_trajectory(db: AsyncSession, survivor_id: str) -> RiskTrajectoryLog | None:
@@ -393,9 +428,11 @@ async def get_assigned_veterans(counselor_id: str, db: AsyncSession = Depends(ge
     """List all veterans assigned specifically to this counselor."""
     c_uuid, c_name = await _resolve_counselor_uuid_and_name(db, counselor_id)
 
-    conditions = []
+    conditions = [
+        VeteranProfile.assigned_counselor_id == str(counselor_id),
+    ]
     if c_uuid:
-        conditions.append(VeteranProfile.assigned_counselor_id == c_uuid)
+        conditions.append(VeteranProfile.assigned_counselor_id == str(c_uuid))
     if c_name:
         conditions.append(func.lower(VeteranProfile.assigned_counselor_name) == c_name.lower())
 

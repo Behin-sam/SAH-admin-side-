@@ -478,28 +478,46 @@ async def choose_counselor(
         conv.last_message_at = now
 
     # Also bind counselor directly to VeteranProfile and CounselorCaseAssignment
-    v_res = await db.execute(select(VeteranProfile).where(VeteranProfile.id == target_vet_id))
-    vet = v_res.scalar_one_or_none()
+    v_res = await db.execute(
+        select(VeteranProfile).where(
+            (VeteranProfile.id == target_vet_id) | (VeteranProfile.survivor_id == target_vet_id)
+        )
+    )
+    vet = v_res.scalars().first()
     if vet:
-        vet.assigned_counselor_id = c_uuid
+        vet.assigned_counselor_id = str(c_uuid)
         vet.assigned_counselor_name = c_name
+
+        surv_uuid = vet.survivor_id if isinstance(vet.survivor_id, uuid.UUID) else uuid.UUID(str(vet.survivor_id))
+        c_uuid_obj = c_uuid if isinstance(c_uuid, uuid.UUID) else uuid.UUID(str(c_uuid))
 
         ca_res = await db.execute(
             select(CounselorCaseAssignment).where(
-                CounselorCaseAssignment.survivor_id == vet.survivor_id,
-                CounselorCaseAssignment.counselor_id == c_uuid,
+                CounselorCaseAssignment.survivor_id == surv_uuid,
+                CounselorCaseAssignment.counselor_id == c_uuid_obj,
             )
         )
         ca = ca_res.scalar_one_or_none()
         if not ca:
             ca = CounselorCaseAssignment(
-                survivor_id=vet.survivor_id,
-                counselor_id=c_uuid,
+                id=uuid.uuid4(),
+                survivor_id=surv_uuid,
+                counselor_id=c_uuid_obj,
                 is_active=True,
             )
             db.add(ca)
         else:
             ca.is_active = True
+
+        # Deactivate other counselor assignments for this survivor so only 1 counselor is active
+        other_cas = await db.execute(
+            select(CounselorCaseAssignment).where(
+                CounselorCaseAssignment.survivor_id == surv_uuid,
+                CounselorCaseAssignment.counselor_id != c_uuid_obj,
+            )
+        )
+        for old_ca in other_cas.scalars().all():
+            old_ca.is_active = False
 
     await db.commit()
 

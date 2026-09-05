@@ -191,10 +191,10 @@ const ProfileScreen = ({ navigation }) => {
   const handleSelectCounselor = async (counselor) => {
     try {
       if (user?.id) {
-        await chatAPI.chooseCounselor(user.id, counselor.id, counselor.name).catch(() => {});
+        await chatAPI.chooseCounselor(user.id, counselor.id, counselor.name);
       }
     } catch (e) {
-      console.warn('Counselor select api fallback:', e);
+      console.warn('Counselor select api error:', e);
     }
 
     const updated = {

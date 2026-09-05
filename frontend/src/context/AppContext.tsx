@@ -649,18 +649,99 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  // Synchronize Counselor's Assigned Caseload directly from API
+  useEffect(() => {
+    if (!currentUser || currentUser.role !== 'counselor') return;
+
+    let isMounted = true;
+    const fetchCaseload = async () => {
+      try {
+        const res = await apiService.getAssignedVeterans(currentUser.id);
+        if (isMounted && res?.veterans) {
+          const liveAssigned = res.veterans.map((v: any) => ({
+            user: {
+              id: v.id,
+              name: v.name,
+              rank: v.rank,
+              unit: 'Para Special Forces',
+              role: 'veteran' as UserRole,
+              avatarUrl: v.avatarUrl,
+              email: v.email || `${v.name.toLowerCase().replace(/\s+/g, '')}@sah.org`,
+              isEmailVerified: true,
+              assignedCounselorId: v.assigned_counselor_id,
+              assignedCounselorName: v.assigned_counselor_name,
+              serviceBranch: v.service_branch,
+            },
+            profile: {
+              veteranId: v.id,
+              serviceBranch: v.service_branch,
+              yearsOfService: 10,
+              physicalActivityLevel: 'Moderate' as const,
+              socialInteractionLevel: 'Moderate' as const,
+              sleepConsistencyLevel: 'Moderate' as const,
+              outdoorEngagementLevel: 'High' as const,
+              routineStabilityLevel: 'Moderate' as const,
+              recommendedFocus: ['Grounding', 'Cardio walk', 'Peer group'],
+              checkInFrequencyDays: 7,
+              streakDays: v.current_streak || 1,
+              totalXP: v.total_points || 50,
+              level: Math.floor((v.total_points || 50) / 300) + 1,
+              badges: [],
+              currentRiskLevel: (v.credibility_score && v.credibility_score < 40) ? 'URGENT REVIEW' as const : 'NORMAL' as const,
+              credibilityScore: v.credibility_score ?? 85,
+              stabilityScore: v.stability_score ?? 85,
+            },
+          }));
+
+          setAllVeterans(prev => {
+            const updated = [...prev];
+            for (const la of liveAssigned) {
+              const idx = updated.findIndex(u => u.user.id === la.user.id);
+              if (idx >= 0) {
+                updated[idx] = {
+                  ...updated[idx],
+                  user: {
+                    ...updated[idx].user,
+                    assignedCounselorId: la.user.assignedCounselorId,
+                    assignedCounselorName: la.user.assignedCounselorName,
+                  },
+                  profile: {
+                    ...updated[idx].profile,
+                    ...la.profile,
+                  },
+                };
+              } else {
+                updated.unshift(la);
+              }
+            }
+            return updated;
+          });
+        }
+      } catch (err) {
+        console.warn('Failed to fetch counselor caseload:', err);
+      }
+    };
+
+    fetchCaseload();
+    const interval = setInterval(fetchCaseload, 4000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [currentUser]);
+
   // Strict Caseload Filtering: Only veterans assigned to this counselor
   const assignedVeterans = useMemo(() => {
     if (!currentUser || currentUser.role !== 'counselor') return [];
-    const cId = currentUser.id;
+    const cId = currentUser.id?.toLowerCase().trim();
     const cName = currentUser.name?.toLowerCase().trim();
 
     return allVeterans.filter(v => {
-      const vCounselorId = v.user.assignedCounselorId;
+      const vCounselorId = v.user.assignedCounselorId?.toLowerCase().trim();
       const vCounselorName = v.user.assignedCounselorName?.toLowerCase().trim();
 
-      const idMatch = vCounselorId && (vCounselorId === cId || cId.includes(vCounselorId) || vCounselorId.includes(cId));
-      const nameMatch = cName && vCounselorName && (vCounselorName.includes(cName) || cName.includes(vCounselorName));
+      const idMatch = Boolean(cId && vCounselorId && (vCounselorId === cId || cId.includes(vCounselorId) || vCounselorId.includes(cId)));
+      const nameMatch = Boolean(cName && vCounselorName && (vCounselorName.includes(cName) || cName.includes(vCounselorName)));
       return idMatch || nameMatch;
     });
   }, [allVeterans, currentUser]);
