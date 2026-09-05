@@ -123,13 +123,13 @@ export const Header: React.FC = () => {
           {/* User Profile & Logout */}
           <div className="flex items-center gap-2 pl-2 border-l border-[#E8DCCE]">
             <img
-              src={currentRole === 'veteran' ? currentVeteranUser.avatarUrl : 'https://images.unsplash.com/photo-1594824813566-88855ce78905?auto=format&fit=crop&q=80&w=200'}
+              src={currentRole === 'veteran' ? currentVeteranUser.avatarUrl : (currentUser?.avatarUrl || 'https://images.unsplash.com/photo-1594824813566-88855ce78905?auto=format&fit=crop&q=80&w=200')}
               alt="Avatar"
               className="w-8 h-8 rounded-full border border-[#E8DCCE] object-cover"
             />
             <div className="hidden lg:block text-left">
               <div className="text-xs font-bold text-[#1C1917] flex items-center gap-1">
-                <span>{currentRole === 'veteran' ? currentVeteranUser.name : 'Dr. Ananya Nair'}</span>
+                <span>{currentRole === 'veteran' ? currentVeteranUser.name : (currentUser?.name || 'Clinical Caregiver')}</span>
                 {currentUser?.isEmailVerified && (
                   <span title="Email Verified" className="inline-flex">
                     <CheckCircle2 className="w-3 h-3 text-[#D96B27]" />
@@ -137,7 +137,7 @@ export const Header: React.FC = () => {
                 )}
               </div>
               <div className="text-[10px] text-[#786F68] font-mono capitalize">
-                {currentRole === 'veteran' ? `Level ${currentVeteranProfile.level} Veteran` : 'Clinical Supervisor'}
+                {currentRole === 'veteran' ? `Level ${currentVeteranProfile.level} Veteran` : (currentUser?.title || 'Clinical Specialist')}
               </div>
             </div>
 

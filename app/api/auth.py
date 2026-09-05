@@ -8,7 +8,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -101,19 +101,53 @@ async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
     if req.role == "counselor" or "counselor" in email_clean or "dr." in email_clean:
         c_found = None
         if raw_ident:
-            c_res = await db.execute(select(CounselorProfile).where(CounselorProfile.email == raw_ident))
-            c_found = c_res.scalar_one_or_none()
+            # 1. Exact email match (case-insensitive)
+            c_res = await db.execute(
+                select(CounselorProfile).where(func.lower(CounselorProfile.email) == email_clean)
+            )
+            c_found = c_res.scalars().first()
             if not c_found:
-                # search by name substring or email match
+                # 2. Search by name match or partial email
                 c_res2 = await db.execute(select(CounselorProfile))
-                for cp in c_res2.scalars().all():
-                    if cp.name.lower() in email_clean or email_clean in cp.name.lower() or (cp.email and cp.email.lower() == email_clean):
+                all_c = c_res2.scalars().all()
+                for cp in all_c:
+                    cp_name_clean = (cp.name or "").lower()
+                    cp_email_clean = (cp.email or "").lower()
+                    if cp_email_clean and (email_clean == cp_email_clean or email_clean in cp_email_clean or cp_email_clean in email_clean):
+                        c_found = cp
+                        break
+                    if cp_name_clean and (email_clean in cp_name_clean or cp_name_clean in email_clean):
                         c_found = cp
                         break
 
-        if not c_found:
-            c_res = await db.execute(select(CounselorProfile))
+        # Only fall back to first counselor if this was a generic demo login without specific email
+        if not c_found and ("nair" in email_clean or "ananya" in email_clean or "demo" in email_clean or not raw_ident):
+            c_res = await db.execute(select(CounselorProfile).order_by(CounselorProfile.created_at.asc()))
             c_found = c_res.scalars().first()
+
+        # If user registered or provided custom counselor email not yet seeded in DB, create their session accurately
+        if not c_found and raw_ident:
+            new_c_id = uuid.uuid4()
+            clean_display_name = raw_ident.split("@")[0].replace(".", " ").title()
+            if not clean_display_name.lower().startswith("dr"):
+                clean_display_name = f"Dr. {clean_display_name}"
+            c_found = CounselorProfile(
+                id=new_c_id,
+                name=clean_display_name,
+                title="Licensed Clinical Counselor",
+                specialization="Trauma & Combat PTSD Recovery",
+                credentials="PhD, LCSW",
+                institution="Amrita Health & Rehabilitation",
+                email=email_clean,
+                avatar_url="https://images.unsplash.com/photo-1594824813566-88855ce78905?auto=format&fit=crop&q=80&w=200",
+                is_available=True,
+                max_veterans=25,
+                current_veterans=0,
+                avg_response_minutes=30,
+            )
+            db.add(c_found)
+            await db.commit()
+            await db.refresh(c_found)
 
         c_id = str(c_found.id) if c_found else "c0000000-0000-0000-0000-000000000001"
         c_name = c_found.name if c_found else "Dr. Ananya Nair, MD"
@@ -357,6 +391,42 @@ async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
         }
 
     # Counselor registration
+    email_clean = (req.email or "").strip().lower()
+    existing_c = None
+    if email_clean:
+        c_res = await db.execute(
+            select(CounselorProfile).where(func.lower(CounselorProfile.email) == email_clean)
+        )
+        existing_c = c_res.scalars().first()
+
+    if existing_c:
+        existing_c.name = req.name
+        existing_c.title = req.title or existing_c.title
+        existing_c.specialization = req.specialization or existing_c.specialization
+        existing_c.credentials = req.credentials or existing_c.credentials
+        existing_c.institution = req.institution or existing_c.institution
+        existing_c.phone = req.phone or existing_c.phone
+        await db.commit()
+        await db.refresh(existing_c)
+        return {
+            "success": True,
+            "token": f"counselor-jwt-{str(existing_c.id)}",
+            "user": {
+                "id": str(existing_c.id),
+                "name": existing_c.name,
+                "email": existing_c.email,
+                "role": "counselor",
+                "rank": "Clinical Specialist",
+                "title": existing_c.title,
+                "specialization": existing_c.specialization,
+                "credentials": existing_c.credentials,
+                "institution": existing_c.institution,
+                "phone": existing_c.phone,
+                "avatarUrl": existing_c.avatar_url or "https://images.unsplash.com/photo-1594824813566-88855ce78905?auto=format&fit=crop&q=80&w=200",
+                "isEmailVerified": True,
+            },
+        }
+
     new_counselor_id = uuid.uuid4()
     counselor = CounselorProfile(
         id=new_counselor_id,
@@ -365,7 +435,7 @@ async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
         specialization=req.specialization or "Trauma & PTSD Recovery",
         credentials=req.credentials or "PhD, LCSW",
         institution=req.institution or "Amrita Health & Rehabilitation",
-        email=req.email,
+        email=email_clean,
         phone=req.phone or "+91 98765 43210",
         avatar_url=req.avatar_url or "https://images.unsplash.com/photo-1594824813566-88855ce78905?auto=format&fit=crop&q=80&w=200",
         is_available=True,

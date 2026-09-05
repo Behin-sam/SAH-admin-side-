@@ -3,7 +3,7 @@ import { LayoutDashboard, Users, ArrowRight, BrainCircuit } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
 export const DashboardOverview: React.FC = () => {
-  const { allVeterans, setActiveVeteranId, setActiveScreen, aiInsights } = useApp();
+  const { allVeterans, setActiveVeteranId, setActiveScreen, aiInsights, currentUser } = useApp();
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 py-4 animate-fadeIn">
@@ -31,7 +31,7 @@ export const DashboardOverview: React.FC = () => {
         <div className="p-4 rounded-2xl glass-panel shadow-warm">
           <div className="label-overline text-[9px]">Total Active Veterans</div>
           <div className="text-3xl font-extrabold text-[#1C1917] font-heading mt-2">24</div>
-          <div className="text-[10px] text-[#786F68] mt-1">Assigned to Dr. Ananya Nair</div>
+          <div className="text-[10px] text-[#786F68] mt-1">Assigned to {currentUser?.name || 'Accredited Specialist'}</div>
         </div>
 
         <div className="p-4 rounded-2xl glass-panel bg-[#FDF2E9] border-[#F7DFCC] shadow-warm">

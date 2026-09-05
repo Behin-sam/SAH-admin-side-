@@ -471,7 +471,7 @@ export const ProfileSettingsView: React.FC = () => {
             <div className="flex items-center justify-between p-3.5 rounded-xl bg-[#FDF6EE] border border-[#E8DCCE]">
               <div>
                 <span className="font-bold text-[#1C1917] block">Assigned Clinical Care Lead</span>
-                <span className="text-[#786F68]">Dr. Ananya Nair, MD • Lead Trauma Specialist (Amrita)</span>
+                <span className="text-[#786F68]">{currentVeteranUser.assignedCounselorName || 'Dr. Ananya Nair, MD'} • Primary Specialist</span>
               </div>
               <span className="px-2.5 py-1 rounded-lg bg-teal-50 text-teal-800 font-bold border border-teal-200">
                 Connected

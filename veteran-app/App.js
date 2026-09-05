@@ -242,12 +242,16 @@ export default function App() {
     let mockUser;
     const emailLower = (email || '').toLowerCase();
     if (role === 'counselor' || emailLower.includes('nair') || emailLower.includes('counselor')) {
+      const isAnanya = emailLower.includes('nair') || emailLower.includes('ananya') || (!email && role === 'counselor');
+      const counselorName = isAnanya
+        ? 'Dr. Ananya Nair'
+        : ('Dr. ' + (email.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase())));
       mockUser = {
-        id: 'counselor-01',
-        name: 'Dr. Ananya Nair',
+        id: isAnanya ? 'counselor-01' : `counselor-${Date.now()}`,
+        name: counselorName,
         email: email || 'a.nair@amrita-health.org',
         role: 'counselor',
-        rank: 'Clinical Lead',
+        rank: 'Clinical Specialist',
         service_branch: 'Trauma & Wellness Specialist',
         total_points: 999,
         current_streak: 30,

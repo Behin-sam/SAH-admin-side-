@@ -309,11 +309,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } catch (e) {
         console.warn('Counselor login fallback:', e);
       }
-      setCurrentUser(CURRENT_COUNSELOR);
+      const emailLower = (email || '').toLowerCase();
+      const isDemoNair = emailLower.includes('nair') || emailLower.includes('ananya') || !email;
+      const cleanName = isDemoNair
+        ? CURRENT_COUNSELOR.name
+        : email.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase()).replace(/^(?!Dr\b)/, 'Dr. ');
+      const fallbackCounselor: User = isDemoNair ? CURRENT_COUNSELOR : {
+        id: `counselor-${Date.now()}`,
+        name: cleanName,
+        email: email,
+        role: 'counselor',
+        rank: 'Clinical Specialist',
+        title: 'Licensed Clinical Counselor',
+        specialization: 'Trauma & PTSD Recovery',
+        credentials: 'PhD, LCSW',
+        institution: 'Amrita Health & Rehabilitation',
+        avatarUrl: 'https://images.unsplash.com/photo-1594824813566-88855ce78905?auto=format&fit=crop&q=80&w=200',
+        isEmailVerified: true,
+      };
+      setCurrentUser(fallbackCounselor);
       setCurrentRole('counselor');
       setIsAuthenticated(true);
       setActiveScreen('dashboard-overview');
-      localStorage.setItem('sah_active_user', JSON.stringify(CURRENT_COUNSELOR));
+      localStorage.setItem('sah_active_user', JSON.stringify(fallbackCounselor));
       localStorage.setItem('sah_active_role', 'counselor');
     } else {
       try {
@@ -759,8 +777,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const newNote: CounselorNote = {
       id: `cn-${Date.now()}`,
       veteranId,
-      counselorId: CURRENT_COUNSELOR.id,
-      authorName: CURRENT_COUNSELOR.name,
+      counselorId: currentUser?.id || CURRENT_COUNSELOR.id,
+      authorName: currentUser?.name || CURRENT_COUNSELOR.name,
       date: new Date().toISOString().split('T')[0],
       text,
       isPrivate: false
