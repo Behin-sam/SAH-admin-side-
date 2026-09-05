@@ -10,7 +10,7 @@
  * - Counselor management & Preferences
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -217,6 +217,7 @@ const ProfileScreen = ({ navigation }) => {
 
   const assignedCounselor = user?.assignedCounselorName || 'Dr. Ananya Nair, MD';
   const avatarObj = AVATAR_PRESETS.find((p) => p.id === selectedAvatar) || AVATAR_PRESETS[0];
+  const isCustomImg = typeof selectedAvatar === 'string' && (selectedAvatar.startsWith('http') || selectedAvatar.startsWith('data:'));
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
@@ -225,14 +226,14 @@ const ProfileScreen = ({ navigation }) => {
         <View style={styles.heroTopRow}>
           {/* Avatar with Edit Camera Overlay */}
           <TouchableOpacity
-            style={[styles.avatarWrap, { backgroundColor: avatarObj.bg, borderColor: avatarObj.color }]}
+            style={[styles.avatarWrap, { backgroundColor: avatarObj?.bg || '#F7DFCC', borderColor: avatarObj?.color || '#8C4A1E' }]}
             onPress={() => setAvatarModalVisible(true)}
             activeOpacity={0.85}
           >
-            {selectedAvatar.startsWith('http') || selectedAvatar.startsWith('data:') ? (
+            {isCustomImg ? (
               <Image source={{ uri: selectedAvatar }} style={styles.avatarImg} />
             ) : (
-              <Ionicons name={avatarObj.icon} size={38} color={avatarObj.color} />
+              <Ionicons name={avatarObj?.icon || 'shield'} size={38} color={avatarObj?.color || '#8C4A1E'} />
             )}
             <View style={styles.avatarBadge}>
               <Ionicons name="camera" size={12} color="#FFFFFF" />
@@ -684,21 +685,24 @@ const ProfileScreen = ({ navigation }) => {
             </Text>
 
             <ScrollView style={{ maxHeight: 380, marginTop: 12 }}>
-              {counselorsList.map((c) => {
+              {(counselorsList || []).map((c) => {
                 const isCurrent = assignedCounselor === c.name;
+                const avatarText = typeof c.avatar === 'string' && c.avatar.length <= 4
+                  ? c.avatar
+                  : (c.name ? c.name.replace(/[^A-Za-z]/g, '').slice(0, 2).toUpperCase() : 'CL');
                 return (
                   <TouchableOpacity
-                    key={c.id}
+                    key={c.id || c.name}
                     style={[styles.counselorSelectItem, isCurrent && styles.counselorSelectItemActive]}
                     onPress={() => handleSelectCounselor(c)}
                   >
                     <View style={styles.counselorAvatarCircle}>
-                      <Text style={styles.counselorAvatarText}>{c.avatar || 'CL'}</Text>
+                      <Text style={styles.counselorAvatarText}>{avatarText}</Text>
                     </View>
                     <View style={{ flex: 1, marginLeft: 12 }}>
-                      <Text style={styles.counselorItemName}>{c.name}</Text>
-                      <Text style={styles.counselorItemTitle}>{c.title}</Text>
-                      <Text style={styles.counselorItemInst}>{c.institution || c.specialty || c.specialization}</Text>
+                      <Text style={styles.counselorItemName}>{c.name || 'Clinical Specialist'}</Text>
+                      <Text style={styles.counselorItemTitle}>{c.title || 'Therapist'}</Text>
+                      <Text style={styles.counselorItemInst}>{c.institution || c.specialty || c.specialization || 'Clinical Command'}</Text>
                     </View>
                     {isCurrent && (
                       <Ionicons name="checkmark-circle" size={20} color="#0D9488" />
