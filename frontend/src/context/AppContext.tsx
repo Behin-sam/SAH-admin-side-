@@ -51,6 +51,7 @@ interface AppContextType {
   acknowledgeInsight: (insightId: string) => void;
   addCounselorNote: (veteranId: string, text: string) => void;
   resetOnboarding: () => void;
+  assignCounselor: (counselorId: string, counselorName: string) => Promise<void>;
 
   // Groups / Squads & XP
   joinedGroups: any[];
@@ -405,9 +406,75 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const assignCounselor = async (counselorId: string, counselorName: string) => {
+    if (currentUser) {
+      const updatedUser: User = {
+        ...currentUser,
+        assignedCounselorId: counselorId,
+        assignedCounselorName: counselorName,
+      };
+      setCurrentUser(updatedUser);
+      localStorage.setItem('sah_active_user', JSON.stringify(updatedUser));
+
+      setAllVeterans(prev =>
+        prev.map(v => (v.user.id === currentUser.id ? { ...v, user: updatedUser } : v))
+      );
+
+      try {
+        await apiService.assignCounselor(currentUser.id, counselorId, counselorName);
+      } catch (e) {
+        console.warn('Backend assignCounselor error:', e);
+      }
+    }
+  };
+
   const registerNewUser = async (userData: Omit<User, 'id' | 'avatarUrl' | 'isEmailVerified'>) => {
-    let newId = `vet-${Date.now()}`;
+    let newId = userData.role === 'counselor' ? `counselor-${Date.now()}` : `vet-${Date.now()}`;
     let registeredUser: any = null;
+
+    if (userData.role === 'counselor') {
+      try {
+        const res = await apiService.register({
+          name: userData.name,
+          email: userData.email,
+          role: 'counselor',
+          rank: 'Clinical Specialist',
+          title: userData.title || 'Licensed Clinical Counselor',
+          specialization: userData.specialization || 'Trauma & PTSD Recovery',
+          credentials: userData.credentials || 'PhD, LCSW',
+          institution: userData.institution || 'Amrita Health & Rehabilitation',
+          phone: userData.phone || '',
+        });
+        if (res?.user) {
+          registeredUser = res.user;
+          newId = res.user.id;
+        }
+      } catch (err) {
+        console.warn('Backend counselor register fallback:', err);
+      }
+
+      const counselorUser: User = {
+        ...userData,
+        id: newId,
+        role: 'counselor',
+        rank: 'Clinical Specialist',
+        title: userData.title || 'Licensed Clinical Counselor',
+        specialization: userData.specialization || 'Trauma & PTSD Recovery',
+        credentials: userData.credentials || 'PhD, LCSW',
+        institution: userData.institution || 'Amrita Health & Rehabilitation',
+        avatarUrl: registeredUser?.avatarUrl || 'https://images.unsplash.com/photo-1594824813566-88855ce78905?auto=format&fit=crop&q=80&w=200',
+        isEmailVerified: true,
+      };
+
+      setCurrentUser(counselorUser);
+      setCurrentRole('counselor');
+      setIsAuthenticated(true);
+      setActiveScreen('dashboard-overview');
+
+      localStorage.setItem('sah_active_user', JSON.stringify(counselorUser));
+      localStorage.setItem('sah_active_role', 'counselor');
+      return;
+    }
 
     try {
       const res = await apiService.register({
@@ -765,6 +832,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         acknowledgeInsight,
         addCounselorNote,
         resetOnboarding,
+        assignCounselor,
         joinedGroups,
         setJoinedGroups,
         awardXP,

@@ -138,8 +138,20 @@ const DashboardScreen = ({ navigation }) => {
   const [dashboardData, setDashboardData] = useState(null);
   const [completingTaskId, setCompletingTaskId] = useState(null);
   const [counselorModalVisible, setCounselorModalVisible] = useState(false);
+  const [counselorsList, setCounselorsList] = useState(COUNSELORS_LIST);
   const [groundingModalVisible, setGroundingModalVisible] = useState(false);
   const [groundingStep, setGroundingStep] = useState(5);
+
+  const loadCounselors = async () => {
+    try {
+      const res = await chatAPI.listCounselors();
+      if (res?.counselors && res.counselors.length > 0) {
+        setCounselorsList(res.counselors);
+      }
+    } catch (e) {
+      console.warn('Counselors directory fetch fallback:', e);
+    }
+  };
 
   const loadDashboard = useCallback(async () => {
     try {
@@ -199,17 +211,20 @@ const DashboardScreen = ({ navigation }) => {
 
   useEffect(() => {
     loadDashboard();
+    loadCounselors();
   }, [loadDashboard]);
 
   useFocusEffect(
     useCallback(() => {
       loadDashboard();
+      loadCounselors();
     }, [loadDashboard])
   );
 
   const onRefresh = () => {
     setRefreshing(true);
     loadDashboard();
+    loadCounselors();
   };
 
   const handleToggleTask = async (task) => {
@@ -635,7 +650,7 @@ const DashboardScreen = ({ navigation }) => {
             </Text>
 
             <ScrollView style={{ maxHeight: 360, marginTop: 10 }}>
-              {COUNSELORS_LIST.map((c) => {
+              {counselorsList.map((c) => {
                 const isSelected = assignedCounselorName === c.name;
                 return (
                   <TouchableOpacity
@@ -644,12 +659,12 @@ const DashboardScreen = ({ navigation }) => {
                     onPress={() => handleSelectCounselor(c)}
                   >
                     <View style={styles.counselorPickAvatar}>
-                      <Text style={styles.counselorPickAvatarText}>{c.avatar}</Text>
+                      <Text style={styles.counselorPickAvatarText}>{c.avatar || 'CL'}</Text>
                     </View>
                     <View style={{ flex: 1, marginLeft: 12 }}>
                       <Text style={styles.counselorPickName}>{c.name}</Text>
                       <Text style={styles.counselorPickTitle}>{c.title}</Text>
-                      <Text style={styles.counselorPickInst}>{c.institution}</Text>
+                      <Text style={styles.counselorPickInst}>{c.institution || c.specialty || c.specialization}</Text>
                     </View>
                     {isSelected && (
                       <Ionicons name="checkmark-circle" size={22} color="#0D9488" />

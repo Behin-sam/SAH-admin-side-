@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -39,45 +40,39 @@ async def list_counselors(
     veteran_id: uuid.UUID | None = None,
     db: AsyncSession = Depends(get_db),
 ):
-    """List available counselors/therapists."""
+    """List available counselors/therapists from database."""
     result = await db.execute(
-        select(CounselorProfile).where(CounselorProfile.is_available == True)
+        select(CounselorProfile).where(CounselorProfile.is_available == True).order_by(CounselorProfile.created_at.asc())
     )
     counselors = result.scalars().all()
 
-    if not counselors:
-        # Provide default counselor if none in DB
-        return {
-            "counselors": [
-                {
-                    "id": "counselor-01",
-                    "name": "Dr. Ananya Nair",
-                    "title": "Clinical Lead & Trauma Specialist",
-                    "specialization": "PTSD, Combat Recovery & Somatic Grounding",
-                    "credentials": "MD, LCSW",
-                    "avg_response_minutes": 5,
-                    "current_veterans": 12,
-                    "max_veterans": 25,
-                }
-            ],
-            "total": 1,
-        }
+    out = []
+    for c in counselors:
+        cleaned_name = c.name.replace("Dr.", "").replace("Maj.", "").replace("Gen.", "").replace("(Retd.)", "").strip()
+        parts = cleaned_name.split()
+        initials = ("".join([p[0] for p in parts[:2]])).upper() if parts else "CL"
+        out.append({
+            "id": str(c.id),
+            "name": c.name,
+            "title": c.title or "Clinical Lead & Trauma Specialist",
+            "specialty": c.specialization or "Combat PTSD & Trauma Recovery",
+            "specialization": c.specialization or "Combat PTSD & Trauma Recovery",
+            "credentials": c.credentials or "MD, LCSW",
+            "institution": getattr(c, "institution", None) or "Armed Forces Medical Command",
+            "email": c.email or "",
+            "phone": c.phone or "",
+            "avatar": initials,
+            "avatarUrl": getattr(c, "avatar_url", None) or "https://images.unsplash.com/photo-1594824813566-88855ce78905?auto=format&fit=crop&q=80&w=200",
+            "rating": 4.9,
+            "active_clients": getattr(c, "current_veterans", 8),
+            "current_veterans": getattr(c, "current_veterans", 8),
+            "max_veterans": getattr(c, "max_veterans", 25),
+            "avg_response_minutes": getattr(c, "avg_response_minutes", 15),
+        })
 
     return {
-        "counselors": [
-            {
-                "id": str(c.id),
-                "name": c.name,
-                "title": c.title,
-                "specialization": c.specialization,
-                "credentials": c.credentials,
-                "avg_response_minutes": getattr(c, "avg_response_minutes", 10),
-                "current_veterans": getattr(c, "current_veterans", 0),
-                "max_veterans": getattr(c, "max_veterans", 20),
-            }
-            for c in counselors
-        ],
-        "total": len(counselors),
+        "counselors": out,
+        "total": len(out),
     }
 
 
@@ -85,23 +80,55 @@ async def list_counselors(
 @router.get("/api/veterans/{veteran_id}/chat/messages")
 async def get_direct_messages(
     veteran_id: uuid.UUID,
+    counselor_id: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
 ):
     """Fetch chat history between a veteran and their clinical counselor."""
-    # Find active conversation for this veteran
-    result = await db.execute(
-        select(ChatConversation)
-        .where(ChatConversation.veteran_id == veteran_id)
-        .order_by(ChatConversation.created_at.desc())
-    )
+    c_uuid = None
+    if counselor_id:
+        try:
+            c_uuid = uuid.UUID(counselor_id)
+        except Exception:
+            c_uuid = None
+
+    # Find active conversation for this veteran (optionally filtered by counselor)
+    if c_uuid:
+        result = await db.execute(
+            select(ChatConversation)
+            .where(ChatConversation.veteran_id == veteran_id, ChatConversation.counselor_id == c_uuid)
+            .order_by(ChatConversation.created_at.desc())
+        )
+    else:
+        result = await db.execute(
+            select(ChatConversation)
+            .where(ChatConversation.veteran_id == veteran_id)
+            .order_by(ChatConversation.created_at.desc())
+        )
     conversation = result.scalars().first()
+
+    # Find counselor profile
+    counselor_profile = None
+    if c_uuid:
+        c_res = await db.execute(select(CounselorProfile).where(CounselorProfile.id == c_uuid))
+        counselor_profile = c_res.scalar_one_or_none()
+    elif conversation and conversation.counselor_id:
+        c_res = await db.execute(select(CounselorProfile).where(CounselorProfile.id == conversation.counselor_id))
+        counselor_profile = c_res.scalar_one_or_none()
+
+    if not counselor_profile:
+        # Fall back to first available counselor
+        c_res = await db.execute(select(CounselorProfile).order_by(CounselorProfile.created_at.asc()))
+        counselor_profile = c_res.scalars().first()
+
+    c_id = counselor_profile.id if counselor_profile else uuid.UUID("c0000000-0000-0000-0000-000000000001")
+    c_name = counselor_profile.name if counselor_profile else "Dr. Ananya Nair"
+    c_title = counselor_profile.title if counselor_profile else "Lead Trauma Specialist"
 
     if not conversation:
         # Create initial conversation thread
-        counselor_uuid = uuid.UUID("c0000000-0000-0000-0000-000000000001")
         conversation = ChatConversation(
             veteran_id=veteran_id,
-            counselor_id=counselor_uuid,
+            counselor_id=c_id,
             subject="Clinical Care & Grounding",
             status="active",
         )
@@ -111,9 +138,9 @@ async def get_direct_messages(
         # Seed initial greeting from counselor
         initial_msg = ChatMessage(
             conversation_id=conversation.id,
-            sender_id=counselor_uuid,
+            sender_id=c_id,
             sender_type="counselor",
-            content="Hello! I'm Dr. Ananya Nair, your clinical supervisor. Feel free to reach out here anytime you need guidance, grounding exercises, or care plan adjustments.",
+            content=f"Hello! I am {c_name} ({c_title}). Feel free to reach out here anytime you need guidance, grounding exercises, or care plan adjustments.",
         )
         db.add(initial_msg)
         conversation.last_message = initial_msg.content[:200]
@@ -131,7 +158,10 @@ async def get_direct_messages(
     return {
         "conversation_id": str(conversation.id),
         "veteran_id": str(veteran_id),
-        "counselor_name": "Dr. Ananya Nair",
+        "counselor_id": str(c_id),
+        "counselor_name": c_name,
+        "counselor_title": c_title,
+        "counselor_avatar": getattr(counselor_profile, "avatar_url", None) if counselor_profile else None,
         "messages": [
             {
                 "id": str(m.id),
@@ -328,25 +358,85 @@ COUNSELORS_DIRECTORY = [
 ]
 
 
-@router.get("/api/chat/counselors")
-async def list_counselors():
-    """List available clinical counselors for client selection."""
-    return {"counselors": COUNSELORS_DIRECTORY}
 
 
 class AssignCounselorRequest(BaseModel):
     counselor_id: str
-    counselor_name: str
+    counselor_name: Optional[str] = None
+    veteran_id: Optional[uuid.UUID] = None
 
 
 @router.post("/api/veterans/{veteran_id}/counselor")
-async def choose_counselor(veteran_id: uuid.UUID, req: AssignCounselorRequest, db: AsyncSession = Depends(get_db)):
-    """Assign/change counselor for veteran."""
+@router.post("/api/chat/assign-specialist")
+async def choose_counselor(
+    req: AssignCounselorRequest,
+    veteran_id: Optional[uuid.UUID] = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """Assign/change counselor for veteran and activate conversation."""
+    target_vet_id = veteran_id or req.veteran_id
+    if not target_vet_id:
+        # Fallback to demo veteran if none specified
+        target_vet_id = uuid.UUID("550e8400-e29b-41d4-a716-446655440001")
+
+    c_uuid = None
+    try:
+        c_uuid = uuid.UUID(req.counselor_id)
+    except Exception:
+        c_uuid = uuid.UUID("c0000000-0000-0000-0000-000000000001")
+
+    # Fetch counselor from DB
+    c_res = await db.execute(select(CounselorProfile).where(CounselorProfile.id == c_uuid))
+    counselor = c_res.scalar_one_or_none()
+
+    c_name = counselor.name if counselor else (req.counselor_name or "Dr. Ananya Nair")
+    c_title = counselor.title if counselor else "Lead Clinical Caregiver"
+    c_avatar = getattr(counselor, "avatar_url", None) or "https://images.unsplash.com/photo-1594824813566-88855ce78905?auto=format&fit=crop&q=80&w=200"
+
+    # Check for existing conversation
+    res = await db.execute(
+        select(ChatConversation)
+        .where(ChatConversation.veteran_id == target_vet_id, ChatConversation.counselor_id == c_uuid)
+    )
+    conv = res.scalars().first()
+
+    now = datetime.now(timezone.utc)
+    if not conv:
+        conv = ChatConversation(
+            veteran_id=target_vet_id,
+            counselor_id=c_uuid,
+            subject="Clinical Care & Grounding",
+            status="active",
+            created_at=now,
+            last_message_at=now,
+        )
+        db.add(conv)
+        await db.flush()
+
+        initial_msg = ChatMessage(
+            conversation_id=conv.id,
+            sender_id=c_uuid,
+            sender_type="counselor",
+            content=f"Hello! I am {c_name} ({c_title}). I have accepted your match as your clinical specialist. Feel free to reach out anytime for recovery support.",
+            created_at=now,
+        )
+        db.add(initial_msg)
+        conv.last_message = initial_msg.content[:200]
+    else:
+        conv.status = "active"
+        conv.last_message_at = now
+
+    await db.commit()
+
     return {
         "success": True,
-        "veteran_id": str(veteran_id),
-        "counselor_id": req.counselor_id,
-        "counselor_name": req.counselor_name,
-        "message": f"Successfully matched with {req.counselor_name}",
+        "veteran_id": str(target_vet_id),
+        "counselor_id": str(c_uuid),
+        "counselor_name": c_name,
+        "counselor_title": c_title,
+        "counselor_avatar": c_avatar,
+        "specialization": getattr(counselor, "specialization", "Trauma Recovery"),
+        "institution": getattr(counselor, "institution", "Armed Forces Medical Command"),
+        "message": f"Successfully matched with {c_name}",
     }
 

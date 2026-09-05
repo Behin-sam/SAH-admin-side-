@@ -98,6 +98,8 @@ class CounselorProfile(Base):
     # Contact
     email = Column(String(200), nullable=True)
     phone = Column(String(50), nullable=True)
+    institution = Column(String(200), nullable=True)
+    avatar_url = Column(String(500), nullable=True)
 
     # Response time
     avg_response_minutes = Column(Integer, default=60)

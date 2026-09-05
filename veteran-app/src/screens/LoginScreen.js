@@ -44,6 +44,10 @@ const LoginScreen = ({ navigation }) => {
   const [name, setName] = useState('');
   const [rank, setRank] = useState('');
   const [serviceBranch, setServiceBranch] = useState('Indian Army');
+  const [title, setTitle] = useState('');
+  const [specialization, setSpecialization] = useState('Combat PTSD & Trauma Recovery');
+  const [institution, setInstitution] = useState('');
+  const [phone, setPhone] = useState('');
 
   // OTP Verification
   const [pendingEmail, setPendingEmail] = useState('');
@@ -102,6 +106,10 @@ const LoginScreen = ({ navigation }) => {
       rank: rank || (role === 'veteran' ? 'Soldier' : 'Clinical Specialist'),
       service_branch: serviceBranch,
       role,
+      title: title || 'Licensed Clinical Counselor',
+      specialization: specialization || 'Combat PTSD & Trauma Recovery',
+      institution: institution || 'Amrita Veteran Healthcare Command',
+      phone: phone || '',
     });
     setLoading(false);
 
@@ -322,56 +330,104 @@ const LoginScreen = ({ navigation }) => {
                   </View>
                 </View>
 
-                <View style={styles.rowTwoInputs}>
-                  <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
-                    <Text style={styles.label}>Rank / Designation</Text>
-                    <View style={styles.inputWrapper}>
-                      <TextInput
-                        style={[styles.input, { paddingLeft: 12 }]}
-                        value={rank}
-                        onChangeText={setRank}
-                        placeholder="e.g. Captain"
-                        placeholderTextColor={theme.colors.espresso[400]}
-                      />
-                    </View>
-                  </View>
+                {role === 'counselor' ? (
+                  <>
+                    <View style={styles.rowTwoInputs}>
+                      <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
+                        <Text style={styles.label}>Title / Credentials</Text>
+                        <View style={styles.inputWrapper}>
+                          <TextInput
+                            style={[styles.input, { paddingLeft: 12 }]}
+                            value={title}
+                            onChangeText={setTitle}
+                            placeholder="e.g. Clinical Psychologist, PhD"
+                            placeholderTextColor={theme.colors.espresso[400]}
+                          />
+                        </View>
+                      </View>
 
-                  <View style={[styles.inputGroup, { flex: 1 }]}>
-                    <Text style={styles.label}>Branch</Text>
-                    <View style={styles.inputWrapper}>
-                      <TextInput
-                        style={[styles.input, { paddingLeft: 12 }]}
-                        value={serviceBranch}
-                        onChangeText={setServiceBranch}
-                        placeholder="Indian Army"
-                        placeholderTextColor={theme.colors.espresso[400]}
-                      />
+                      <View style={[styles.inputGroup, { flex: 1 }]}>
+                        <Text style={styles.label}>Institution / Hospital</Text>
+                        <View style={styles.inputWrapper}>
+                          <TextInput
+                            style={[styles.input, { paddingLeft: 12 }]}
+                            value={institution}
+                            onChangeText={setInstitution}
+                            placeholder="e.g. Amrita Healthcare"
+                            placeholderTextColor={theme.colors.espresso[400]}
+                          />
+                        </View>
+                      </View>
                     </View>
-                  </View>
-                </View>
 
-                {/* Service Branch Quick Select Chips */}
-                <View style={styles.branchChipsRow}>
-                  {SERVICE_BRANCHES.map((b) => (
-                    <TouchableOpacity
-                      key={b}
-                      style={[
-                        styles.branchChip,
-                        serviceBranch === b && styles.branchChipActive,
-                      ]}
-                      onPress={() => setServiceBranch(b)}
-                    >
-                      <Text
-                        style={[
-                          styles.branchChipText,
-                          serviceBranch === b && styles.branchChipTextActive,
-                        ]}
-                      >
-                        {b}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
+                    <View style={styles.inputGroup}>
+                      <Text style={styles.label}>Clinical Specialization</Text>
+                      <View style={styles.inputWrapper}>
+                        <Ionicons name="medical-outline" size={18} color={theme.colors.espresso[400]} style={styles.inputIcon} />
+                        <TextInput
+                          style={styles.input}
+                          value={specialization}
+                          onChangeText={setSpecialization}
+                          placeholder="e.g. Combat PTSD & Somatic Grounding"
+                          placeholderTextColor={theme.colors.espresso[400]}
+                        />
+                      </View>
+                    </View>
+                  </>
+                ) : (
+                  <>
+                    <View style={styles.rowTwoInputs}>
+                      <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
+                        <Text style={styles.label}>Rank / Designation</Text>
+                        <View style={styles.inputWrapper}>
+                          <TextInput
+                            style={[styles.input, { paddingLeft: 12 }]}
+                            value={rank}
+                            onChangeText={setRank}
+                            placeholder="e.g. Captain"
+                            placeholderTextColor={theme.colors.espresso[400]}
+                          />
+                        </View>
+                      </View>
+
+                      <View style={[styles.inputGroup, { flex: 1 }]}>
+                        <Text style={styles.label}>Branch</Text>
+                        <View style={styles.inputWrapper}>
+                          <TextInput
+                            style={[styles.input, { paddingLeft: 12 }]}
+                            value={serviceBranch}
+                            onChangeText={setServiceBranch}
+                            placeholder="Indian Army"
+                            placeholderTextColor={theme.colors.espresso[400]}
+                          />
+                        </View>
+                      </View>
+                    </View>
+
+                    {/* Service Branch Quick Select Chips */}
+                    <View style={styles.branchChipsRow}>
+                      {SERVICE_BRANCHES.map((b) => (
+                        <TouchableOpacity
+                          key={b}
+                          style={[
+                            styles.branchChip,
+                            serviceBranch === b && styles.branchChipActive,
+                          ]}
+                          onPress={() => setServiceBranch(b)}
+                        >
+                          <Text
+                            style={[
+                              styles.branchChipText,
+                              serviceBranch === b && styles.branchChipTextActive,
+                            ]}
+                          >
+                            {b}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </>
+                )}
 
                 <View style={styles.inputGroup}>
                   <Text style={styles.label}>Email Address (For Verification)</Text>

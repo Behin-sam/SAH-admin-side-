@@ -18,6 +18,31 @@ export interface User {
   assignedCounselorId?: string;
   assignedCounselorName?: string;
   serviceBranch?: string;
+  title?: string;
+  specialization?: string;
+  credentials?: string;
+  institution?: string;
+  phone?: string;
+}
+
+export interface Counselor {
+  id: string;
+  name: string;
+  title?: string;
+  specialty?: string;
+  specialization?: string;
+  credentials?: string;
+  institution?: string;
+  avatar?: string;
+  avatarUrl?: string;
+  phone?: string;
+  email?: string;
+  rating?: number;
+  active_clients?: number;
+  current_veterans?: number;
+  max_veterans?: number;
+  avg_response_minutes?: number;
+  is_available?: boolean;
 }
 
 export interface VeteranProfile {

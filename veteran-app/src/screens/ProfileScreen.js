@@ -60,9 +60,25 @@ const ProfileScreen = ({ navigation }) => {
 
   // Modals
   const [counselorModalVisible, setCounselorModalVisible] = useState(false);
+  const [counselorsList, setCounselorsList] = useState(COUNSELORS_LIST);
   const [avatarModalVisible, setAvatarModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  const loadCounselors = async () => {
+    try {
+      const res = await chatAPI.listCounselors();
+      if (res?.counselors && res.counselors.length > 0) {
+        setCounselorsList(res.counselors);
+      }
+    } catch (e) {
+      console.warn('Profile counselor list fallback:', e);
+    }
+  };
+
+  useEffect(() => {
+    loadCounselors();
+  }, []);
 
   // Selected avatar
   const [selectedAvatar, setSelectedAvatar] = useState(user?.avatar_url || 'eagle');
@@ -668,7 +684,7 @@ const ProfileScreen = ({ navigation }) => {
             </Text>
 
             <ScrollView style={{ maxHeight: 380, marginTop: 12 }}>
-              {COUNSELORS_LIST.map((c) => {
+              {counselorsList.map((c) => {
                 const isCurrent = assignedCounselor === c.name;
                 return (
                   <TouchableOpacity
@@ -677,12 +693,12 @@ const ProfileScreen = ({ navigation }) => {
                     onPress={() => handleSelectCounselor(c)}
                   >
                     <View style={styles.counselorAvatarCircle}>
-                      <Text style={styles.counselorAvatarText}>{c.avatar}</Text>
+                      <Text style={styles.counselorAvatarText}>{c.avatar || 'CL'}</Text>
                     </View>
                     <View style={{ flex: 1, marginLeft: 12 }}>
                       <Text style={styles.counselorItemName}>{c.name}</Text>
                       <Text style={styles.counselorItemTitle}>{c.title}</Text>
-                      <Text style={styles.counselorItemInst}>{c.institution}</Text>
+                      <Text style={styles.counselorItemInst}>{c.institution || c.specialty || c.specialization}</Text>
                     </View>
                     {isCurrent && (
                       <Ionicons name="checkmark-circle" size={20} color="#0D9488" />

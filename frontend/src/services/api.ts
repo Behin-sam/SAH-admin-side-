@@ -45,10 +45,44 @@ export const apiService = {
     rank?: string;
     unit?: string;
     service_branch?: string;
+    title?: string;
+    specialization?: string;
+    credentials?: string;
+    institution?: string;
+    phone?: string;
   }) {
     return request<{ success: boolean; user: any }>('/auth/register', {
       method: 'POST',
       body: JSON.stringify(userData),
+    });
+  },
+
+  // Counselor & Specialist Endpoints
+  async listCounselors() {
+    return request<{ counselors: any[]; total: number }>('/chat/counselors');
+  },
+
+  async assignCounselor(veteranId: string, counselorId: string, counselorName?: string) {
+    return request<any>(`/veterans/${veteranId}/counselor`, {
+      method: 'POST',
+      body: JSON.stringify({ counselor_id: counselorId, counselor_name: counselorName }),
+    });
+  },
+
+  async getSpecialistChat(veteranId: string, counselorId?: string) {
+    const query = counselorId ? `?counselor_id=${encodeURIComponent(counselorId)}` : '';
+    return request<any>(`/veterans/${veteranId}/chat/messages${query}`);
+  },
+
+  async sendSpecialistMessage(veteranId: string, content: string, senderType: 'veteran' | 'counselor' = 'veteran', counselorId?: string) {
+    return request<any>('/chat/messages', {
+      method: 'POST',
+      body: JSON.stringify({
+        veteran_id: veteranId,
+        content,
+        sender_type: senderType,
+        counselor_id: counselorId,
+      }),
     });
   },
 

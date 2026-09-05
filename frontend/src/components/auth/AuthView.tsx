@@ -16,6 +16,10 @@ export const AuthView: React.FC = () => {
   const [rank, setRank] = useState('');
   const [unit, setUnit] = useState('');
   const [serviceBranch, setServiceBranch] = useState('Indian Army');
+  const [title, setTitle] = useState('');
+  const [specialization, setSpecialization] = useState('Combat PTSD & Trauma Recovery');
+  const [institution, setInstitution] = useState('');
+  const [phone, setPhone] = useState('');
 
   // OTP Verification state
   const [pendingEmail, setPendingEmail] = useState('');
@@ -33,14 +37,27 @@ export const AuthView: React.FC = () => {
     e.preventDefault();
     if (!email || !password || !name) return;
 
-    registerNewUser({
-      name,
-      rank: rank || (role === 'veteran' ? 'Veteran Soldier' : 'Clinical Officer'),
-      unit: unit || 'Defense Medical Command',
-      serviceBranch,
-      email,
-      role
-    });
+    if (role === 'counselor') {
+      registerNewUser({
+        name,
+        role: 'counselor',
+        email,
+        title: title || 'Licensed Clinical Counselor',
+        specialization: specialization || 'Combat PTSD & Trauma Recovery',
+        institution: institution || 'Amrita Health Care & Rehabilitation',
+        phone: phone || '+91 98765 43210',
+        rank: 'Clinical Specialist',
+      });
+    } else {
+      registerNewUser({
+        name,
+        rank: rank || 'Veteran Soldier',
+        unit: unit || 'Infantry Division',
+        serviceBranch,
+        email,
+        role: 'veteran'
+      });
+    }
 
     setPendingEmail(email);
     setAuthMode('verify');
@@ -194,38 +211,81 @@ export const AuthView: React.FC = () => {
                 type="text"
                 value={name}
                 onChange={e => setName(e.target.value)}
-                placeholder="e.g. Subedar Major Suresh Kumar"
+                placeholder={role === 'counselor' ? 'e.g. Dr. Sneha Patel, MD' : 'e.g. Subedar Major Suresh Kumar'}
                 className="w-full bg-[#FDF6EE] border border-[#E8DCCE] rounded-xl p-2.5 text-xs text-[#1C1917] focus:outline-none focus:border-[#D96B27]"
                 required
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-[#1C1917] block">Rank / Designation</label>
-                <input
-                  type="text"
-                  value={rank}
-                  onChange={e => setRank(e.target.value)}
-                  placeholder="e.g. Havildar"
-                  className="w-full bg-[#FDF6EE] border border-[#E8DCCE] rounded-xl p-2.5 text-xs text-[#1C1917] focus:outline-none focus:border-[#D96B27]"
-                />
-              </div>
+            {role === 'counselor' ? (
+              <>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-[#1C1917] block">Title / Credentials</label>
+                    <input
+                      type="text"
+                      value={title}
+                      onChange={e => setTitle(e.target.value)}
+                      placeholder="e.g. Clinical Psychologist, PhD"
+                      className="w-full bg-[#FDF6EE] border border-[#E8DCCE] rounded-xl p-2.5 text-xs text-[#1C1917] focus:outline-none focus:border-[#D96B27]"
+                    />
+                  </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-[#1C1917] block">Branch</label>
-                <select
-                  value={serviceBranch}
-                  onChange={e => setServiceBranch(e.target.value)}
-                  className="w-full bg-[#FDF6EE] border border-[#E8DCCE] rounded-xl p-2.5 text-xs text-[#1C1917] focus:outline-none focus:border-[#D96B27]"
-                >
-                  <option value="Indian Army">Indian Army</option>
-                  <option value="Indian Navy">Indian Navy</option>
-                  <option value="Indian Air Force">Indian Air Force</option>
-                  <option value="Paramilitary">Paramilitary</option>
-                </select>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-[#1C1917] block">Institution / Hospital</label>
+                    <input
+                      type="text"
+                      value={institution}
+                      onChange={e => setInstitution(e.target.value)}
+                      placeholder="e.g. Amrita Medical Institute"
+                      className="w-full bg-[#FDF6EE] border border-[#E8DCCE] rounded-xl p-2.5 text-xs text-[#1C1917] focus:outline-none focus:border-[#D96B27]"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-[#1C1917] block">Clinical Specialization</label>
+                  <select
+                    value={specialization}
+                    onChange={e => setSpecialization(e.target.value)}
+                    className="w-full bg-[#FDF6EE] border border-[#E8DCCE] rounded-xl p-2.5 text-xs text-[#1C1917] focus:outline-none focus:border-[#D96B27]"
+                  >
+                    <option value="Combat PTSD & Trauma Recovery">Combat PTSD & Trauma Recovery</option>
+                    <option value="Cognitive Behavioral Therapy (CBT)">Cognitive Behavioral Therapy (CBT)</option>
+                    <option value="Somatic & Nervous System Grounding">Somatic & Nervous System Grounding</option>
+                    <option value="Sleep Architecture & Stress De-escalation">Sleep Architecture & Stress De-escalation</option>
+                    <option value="Veteran Peer Reintegration & Family Support">Veteran Peer Reintegration & Family Support</option>
+                  </select>
+                </div>
+              </>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-[#1C1917] block">Rank / Designation</label>
+                  <input
+                    type="text"
+                    value={rank}
+                    onChange={e => setRank(e.target.value)}
+                    placeholder="e.g. Havildar"
+                    className="w-full bg-[#FDF6EE] border border-[#E8DCCE] rounded-xl p-2.5 text-xs text-[#1C1917] focus:outline-none focus:border-[#D96B27]"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-[#1C1917] block">Branch</label>
+                  <select
+                    value={serviceBranch}
+                    onChange={e => setServiceBranch(e.target.value)}
+                    className="w-full bg-[#FDF6EE] border border-[#E8DCCE] rounded-xl p-2.5 text-xs text-[#1C1917] focus:outline-none focus:border-[#D96B27]"
+                  >
+                    <option value="Indian Army">Indian Army</option>
+                    <option value="Indian Navy">Indian Navy</option>
+                    <option value="Indian Air Force">Indian Air Force</option>
+                    <option value="Paramilitary">Paramilitary</option>
+                  </select>
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="space-y-1">
               <label className="text-xs font-bold text-[#1C1917] block">Email Address (For Verification)</label>

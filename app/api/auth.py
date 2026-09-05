@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models import SurvivorProfile
 from app.models.gamified import VeteranProfile, DailyTask, TaskStatus, TaskType
+from app.models.chat import CounselorProfile
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -28,11 +29,18 @@ class LoginRequest(BaseModel):
 class RegisterRequest(BaseModel):
     name: str
     email: str
+    password: Optional[str] = None
     role: str = "veteran"
     rank: Optional[str] = None
     unit: Optional[str] = None
     service_branch: Optional[str] = None
     serviceBranch: Optional[str] = None
+    title: Optional[str] = None
+    specialization: Optional[str] = None
+    credentials: Optional[str] = None
+    institution: Optional[str] = None
+    phone: Optional[str] = None
+    avatar_url: Optional[str] = None
 
 
 @router.get("/demo-users")
@@ -66,15 +74,20 @@ async def get_demo_users(db: AsyncSession = Depends(get_db)):
             "avatarUrl": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200",
         })
 
+    c_res = await db.execute(select(CounselorProfile).where(CounselorProfile.is_available == True))
+    c_rows = c_res.scalars().all()
     counselors = [
         {
-            "id": "counselor-01",
-            "name": "Dr. Ananya Nair",
+            "id": str(c.id),
+            "name": c.name,
             "role": "counselor",
-            "title": "Clinical Lead & Trauma Specialist",
-            "email": "a.nair@amrita-health.org",
-            "avatarUrl": "https://images.unsplash.com/photo-1594824813566-88855ce78905?auto=format&fit=crop&q=80&w=200",
+            "title": c.title or "Clinical Lead & Trauma Specialist",
+            "specialization": c.specialization or "Trauma Care",
+            "institution": getattr(c, "institution", None) or "Armed Forces Medical Command",
+            "email": c.email or f"counselor-{str(c.id)[:6]}@sah.org",
+            "avatarUrl": getattr(c, "avatar_url", None) or "https://images.unsplash.com/photo-1594824813566-88855ce78905?auto=format&fit=crop&q=80&w=200",
         }
+        for c in c_rows
     ]
 
     return {"veterans": veterans, "counselors": counselors}
@@ -85,18 +98,43 @@ async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
     """Log in as veteran or counselor."""
     raw_ident = (req.email or req.identifier or "").strip()
     email_clean = raw_ident.lower()
-    if req.role == "counselor" or "counselor" in email_clean or "dr." in email_clean or "nair" in email_clean:
+    if req.role == "counselor" or "counselor" in email_clean or "dr." in email_clean:
+        c_found = None
+        if raw_ident:
+            c_res = await db.execute(select(CounselorProfile).where(CounselorProfile.email == raw_ident))
+            c_found = c_res.scalar_one_or_none()
+            if not c_found:
+                # search by name substring or email match
+                c_res2 = await db.execute(select(CounselorProfile))
+                for cp in c_res2.scalars().all():
+                    if cp.name.lower() in email_clean or email_clean in cp.name.lower() or (cp.email and cp.email.lower() == email_clean):
+                        c_found = cp
+                        break
+
+        if not c_found:
+            c_res = await db.execute(select(CounselorProfile))
+            c_found = c_res.scalars().first()
+
+        c_id = str(c_found.id) if c_found else "c0000000-0000-0000-0000-000000000001"
+        c_name = c_found.name if c_found else "Dr. Ananya Nair, MD"
+        c_title = c_found.title if c_found else "Lead Trauma Specialist"
+        c_email = c_found.email if (c_found and c_found.email) else (raw_ident if "@" in raw_ident else "a.nair@amrita-health.org")
+        c_avatar = (getattr(c_found, "avatar_url", None) if c_found else None) or "https://images.unsplash.com/photo-1594824813566-88855ce78905?auto=format&fit=crop&q=80&w=200"
+        c_inst = (getattr(c_found, "institution", None) if c_found else None) or "Amrita Health"
+
         return {
             "success": True,
-            "token": "mock-counselor-jwt-token",
+            "token": f"counselor-jwt-{c_id}",
             "user": {
-                "id": "counselor-01",
-                "name": "Dr. Ananya Nair",
-                "email": raw_ident if "@" in raw_ident else "a.nair@amrita-health.org",
+                "id": c_id,
+                "name": c_name,
+                "email": c_email,
                 "role": "counselor",
-                "rank": "Clinical Lead",
-                "title": "Clinical Lead & Trauma Specialist",
-                "avatarUrl": "https://images.unsplash.com/photo-1594824813566-88855ce78905?auto=format&fit=crop&q=80&w=200",
+                "rank": "Clinical Specialist",
+                "title": c_title,
+                "specialization": getattr(c_found, "specialization", "Trauma Recovery") if c_found else "Trauma Recovery",
+                "institution": c_inst,
+                "avatarUrl": c_avatar,
                 "isEmailVerified": True,
             },
         }
@@ -318,15 +356,42 @@ async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
             },
         }
 
+    # Counselor registration
+    new_counselor_id = uuid.uuid4()
+    counselor = CounselorProfile(
+        id=new_counselor_id,
+        name=req.name,
+        title=req.title or "Licensed Clinical Counselor",
+        specialization=req.specialization or "Trauma & PTSD Recovery",
+        credentials=req.credentials or "PhD, LCSW",
+        institution=req.institution or "Amrita Health & Rehabilitation",
+        email=req.email,
+        phone=req.phone or "+91 98765 43210",
+        avatar_url=req.avatar_url or "https://images.unsplash.com/photo-1594824813566-88855ce78905?auto=format&fit=crop&q=80&w=200",
+        is_available=True,
+        max_veterans=25,
+        current_veterans=0,
+        avg_response_minutes=45,
+    )
+    db.add(counselor)
     await db.commit()
+    await db.refresh(counselor)
+
     return {
         "success": True,
+        "token": f"counselor-jwt-{str(counselor.id)}",
         "user": {
-            "id": "counselor-01",
-            "name": req.name,
-            "email": req.email,
+            "id": str(counselor.id),
+            "name": counselor.name,
+            "email": counselor.email,
             "role": "counselor",
-            "avatarUrl": "https://images.unsplash.com/photo-1594824813566-88855ce78905?auto=format&fit=crop&q=80&w=200",
+            "rank": "Clinical Specialist",
+            "title": counselor.title,
+            "specialization": counselor.specialization,
+            "credentials": counselor.credentials,
+            "institution": counselor.institution,
+            "phone": counselor.phone,
+            "avatarUrl": counselor.avatar_url,
             "isEmailVerified": True,
         },
     }

@@ -310,18 +310,34 @@ export default function App() {
     } catch (e) {
       console.warn('Backend register fallback:', e);
     }
-    const mockUser = {
-      id: `vet-${Date.now()}`,
-      name: userData.name || 'Veteran Soldier',
-      email: userData.email,
-      role: userData.role || 'veteran',
-      rank: userData.rank || 'Soldier',
-      service_branch: userData.service_branch || userData.serviceBranch || 'Indian Army',
-      total_points: 50,
-      current_streak: 1,
-      tasks_completed: 0,
-      isEmailVerified: true,
-    };
+    const isCounselor = userData.role === 'counselor';
+    const mockUser = isCounselor
+      ? {
+          id: `counselor-${Date.now()}`,
+          name: userData.name || 'Dr. Clinical Counselor',
+          email: userData.email,
+          role: 'counselor',
+          rank: 'Clinical Specialist',
+          title: userData.title || 'Licensed Clinical Counselor',
+          specialization: userData.specialization || 'Trauma & PTSD Recovery',
+          institution: userData.institution || 'Amrita Health & Rehabilitation',
+          avatarUrl: 'https://images.unsplash.com/photo-1594824813566-88855ce78905?auto=format&fit=crop&q=80&w=200',
+          isEmailVerified: true,
+        }
+      : {
+          id: `vet-${Date.now()}`,
+          name: userData.name || 'Veteran Soldier',
+          email: userData.email,
+          role: 'veteran',
+          rank: userData.rank || 'Soldier',
+          service_branch: userData.service_branch || userData.serviceBranch || 'Indian Army',
+          total_points: 50,
+          current_streak: 1,
+          tasks_completed: 0,
+          isEmailVerified: true,
+          assignedCounselorId: 'counselor-01',
+          assignedCounselorName: 'Dr. Ananya Nair',
+        };
     await storage.set('user', JSON.stringify(mockUser));
     setUser(mockUser);
     return { success: true, user: mockUser };
