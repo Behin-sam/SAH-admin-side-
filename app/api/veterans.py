@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models import SurvivorProfile
+from app.engine.ai_alert_engine import evaluate_and_trigger_alerts
 from app.models.gamified import (
     VeteranProfile,
     DailyTask,
@@ -125,6 +126,10 @@ async def get_veteran_profile(veteran_id: uuid.UUID, db: AsyncSession = Depends(
         "tasks_completed_today": tasks_today,
         "groups_joined": groups_count,
         "deployment_count": veteran.deployment_count,
+        "credibility_score": veteran.credibility_score if veteran.credibility_score is not None else 85.0,
+        "stability_score": veteran.stability_score if veteran.stability_score is not None else 85.0,
+        "assigned_counselor_id": str(veteran.assigned_counselor_id) if veteran.assigned_counselor_id else None,
+        "assigned_counselor_name": veteran.assigned_counselor_name,
         # Extended profile fields
         "avatar_url": veteran.avatar_url,
         "bio": veteran.bio,
@@ -406,7 +411,11 @@ async def get_dashboard(veteran_id: uuid.UUID, db: AsyncSession = Depends(get_db
             "current_streak": veteran.current_streak,
             "tasks_completed": veteran.tasks_completed,
             "pending_tasks": pending_tasks,
+            "credibility_score": veteran.credibility_score if veteran.credibility_score is not None else 85.0,
+            "stability_score": veteran.stability_score if veteran.stability_score is not None else 85.0,
         },
+        "assigned_counselor_id": str(veteran.assigned_counselor_id) if veteran.assigned_counselor_id else None,
+        "assigned_counselor_name": veteran.assigned_counselor_name,
         "today_tasks": [
             {
                 "id": str(task.id),
@@ -420,6 +429,30 @@ async def get_dashboard(veteran_id: uuid.UUID, db: AsyncSession = Depends(get_db
             for task in today_tasks
         ],
         "groups": groups,
+    }
+
+
+@router.post("/{veteran_id}/evaluate-credibility")
+async def trigger_credibility_evaluation(
+    veteran_id: uuid.UUID,
+    payload: dict = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """Trigger AI credibility and stability calculation, generating alerts if scores drop."""
+    event = payload.get("event") if payload else None
+    alert = await evaluate_and_trigger_alerts(db, veteran_id, trigger_event=event)
+
+    result = await db.execute(select(VeteranProfile).where(VeteranProfile.id == veteran_id))
+    veteran = result.scalar_one_or_none()
+
+    return {
+        "success": True,
+        "veteran_id": str(veteran_id),
+        "credibility_score": veteran.credibility_score if (veteran and veteran.credibility_score is not None) else 85.0,
+        "stability_score": veteran.stability_score if (veteran and veteran.stability_score is not None) else 85.0,
+        "alert_triggered": alert is not None,
+        "alert_id": str(alert.id) if alert else None,
+        "alert_summary": alert.trend_summary if alert else None,
     }
 
 

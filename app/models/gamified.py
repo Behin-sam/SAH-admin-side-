@@ -96,6 +96,12 @@ class VeteranProfile(Base):
     emergency_contact_phone = Column(String(20), nullable=True)
     home_city = Column(String(100), nullable=True)
 
+    # Counselor Assignment & Clinical Integrity
+    assigned_counselor_id = Column(String(64), nullable=True)
+    assigned_counselor_name = Column(String(100), nullable=True)
+    credibility_score = Column(Float, default=85.0)  # 0.0 - 100.0
+    stability_score = Column(Float, default=85.0)    # 0.0 - 100.0
+
     # Timestamps
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc),

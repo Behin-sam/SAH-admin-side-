@@ -1,12 +1,47 @@
 import React from 'react';
-import { Activity, Heart, BrainCircuit, Calendar, Sliders, MessageCircle, ShieldCheck } from 'lucide-react';
+import { Activity, Heart, BrainCircuit, Calendar, Sliders, MessageCircle, ShieldCheck, Lock, ArrowLeft } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
 export const VeteranDetailView: React.FC = () => {
-  const { currentVeteranUser, currentVeteranProfile, metrics, aiInsights, checkIns, setActiveScreen } = useApp();
+  const { currentVeteranUser, currentVeteranProfile, metrics, aiInsights, checkIns, setActiveScreen, currentUser, assignedVeterans } = useApp();
+
+  // Caseload confidentiality isolation guard:
+  // If a counselor attempts to view a veteran who has not chosen them, block access.
+  const isCounselor = currentUser?.role === 'counselor';
+  const isAssigned = !isCounselor || assignedVeterans.some(v => v.user.id === currentVeteranUser.id);
+
+  if (!isAssigned) {
+    return (
+      <div className="max-w-3xl mx-auto py-16 px-4 animate-fadeIn text-center space-y-6">
+        <div className="w-16 h-16 rounded-3xl bg-rose-100 border border-rose-200 text-rose-700 flex items-center justify-center mx-auto shadow-warm">
+          <Lock className="w-8 h-8" />
+        </div>
+        <div className="space-y-2">
+          <span className="label-overline text-[10px] text-rose-700 font-bold">CONFIDENTIALITY ACCESS RESTRICTION</span>
+          <h1 className="font-heading text-2xl sm:text-3xl font-extrabold text-[#1C1917]">
+            Client Record Protected
+          </h1>
+          <p className="text-xs text-[#786F68] max-w-md mx-auto leading-relaxed">
+            Strict confidentiality controls are active. Only the primary specialist assigned by <strong>{currentVeteranUser.name}</strong> can review their clinical dossier, stability trajectories, and sensitive check-in notes.
+          </p>
+        </div>
+
+        <div className="pt-2">
+          <button
+            onClick={() => setActiveScreen('counselor-dashboard')}
+            className="px-5 py-2.5 rounded-xl bg-[#1C1917] hover:bg-black text-white text-xs font-bold font-heading tracking-wider flex items-center gap-2 mx-auto shadow-warm transition-all"
+          >
+            <ArrowLeft className="w-4 h-4" /> Return to My Assigned Caseload
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const vetInsights = aiInsights.filter(i => i.veteranId === currentVeteranUser.id);
   const latestMetric = metrics[metrics.length - 1] || { physicalScore: 80, mentalScore: 75, stressLevel: 4, sleepHours: 7.5 };
+  const credibility = currentVeteranProfile.credibilityScore ?? 85;
+  const stability = currentVeteranProfile.stabilityScore ?? 85;
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 py-4 animate-fadeIn">
@@ -19,10 +54,18 @@ export const VeteranDetailView: React.FC = () => {
             className="w-16 h-16 rounded-full object-cover border-2 border-[#D96B27] shadow-rust"
           />
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h1 className="font-heading text-2xl font-bold text-[#1C1917]">{currentVeteranUser.name}</h1>
               <span className="badge-pill-rust">
                 {currentVeteranProfile.currentRiskLevel}
+              </span>
+              <span className={`text-[11px] font-bold font-mono px-2.5 py-0.5 rounded-full ${
+                credibility < 50 ? 'bg-rose-100 text-rose-800 border border-rose-300' : 'bg-[#F7DFCC] text-[#8C4A1E]'
+              }`}>
+                Credibility: {credibility}/100
+              </span>
+              <span className="text-[11px] font-bold font-mono px-2.5 py-0.5 rounded-full bg-[#EFE9DF] text-[#1C1917]">
+                Stability: {stability}/100
               </span>
             </div>
             <p className="text-xs text-[#786F68] mt-1">

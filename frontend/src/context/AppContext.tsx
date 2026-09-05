@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { User, VeteranProfile, Task, DailyMetrics, CheckInSurvey, AIInsight, NotificationItem, CounselorNote, UserRole, TaskStatus } from '../types';
 import { CURRENT_COUNSELOR, DEMO_VETERANS, INITIAL_TASKS_VET_1, INITIAL_TASKS_VET_3, NEW_USER_STARTER_TASKS, MOCK_AI_INSIGHTS, MOCK_NOTIFICATIONS, MOCK_COUNSELOR_NOTES, generate30DayMetrics } from '../data/mockData';
 import { apiService } from '../services/api';
@@ -24,12 +24,14 @@ interface AppContextType {
   currentVeteranUser: User;
   currentVeteranProfile: VeteranProfile;
   allVeterans: { user: User; profile: VeteranProfile }[];
+  assignedVeterans: { user: User; profile: VeteranProfile }[];
   tasks: Task[];
   metrics: DailyMetrics[];
   aiInsights: AIInsight[];
   notifications: NotificationItem[];
   counselorNotes: CounselorNote[];
   checkIns: CheckInSurvey[];
+  triggerEmergencyAlert: (reason?: string) => Promise<void>;
 
   // Modals & Triggers
   isCrisisModalOpen: boolean;
@@ -278,6 +280,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             setCurrentUser(activeUser);
             setIsAuthenticated(true);
             setCurrentRole('counselor');
+
+            // Fetch live alerts for this counselor
+            try {
+              const alertsRes = await apiService.getCounselorAlerts(activeUser.id);
+              if (alertsRes?.alerts && alertsRes.alerts.length > 0) {
+                const liveInsights: AIInsight[] = alertsRes.alerts.map((a: any) => ({
+                  id: a.id,
+                  veteranId: a.veteran_id,
+                  veteranName: a.veteran_name,
+                  timestamp: a.created_at ? new Date(a.created_at).toLocaleString() : 'Just now',
+                  riskLevel: a.alert_type === 'acute' ? 'URGENT REVIEW' : 'ATTENTION',
+                  confidence: 'High',
+                  detectedChanges: a.contributing_topics || ['Clinical deviation detected'],
+                  reasons: [a.trend_summary],
+                  recommendedActions: a.alert_type === 'acute'
+                    ? ['Initiate immediate crisis outreach protocol', 'Call primary emergency contact']
+                    : ['Schedule supportive check-in', 'Review daily grounding routine'],
+                  acknowledgedByCounselor: a.status === 'acknowledged',
+                  credibilityScore: a.credibility_score,
+                  alertType: a.alert_type,
+                }));
+                setAiInsights(liveInsights);
+              }
+            } catch (e) {
+              console.warn('Live counselor alerts fetch error:', e);
+            }
           }
         } else {
           // Unauthenticated visitor
@@ -767,10 +795,58 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }));
   };
 
-  const acknowledgeInsight = (insightId: string) => {
+  // Strict Caseload Filtering: Only veterans assigned to this counselor
+  const assignedVeterans = useMemo(() => {
+    if (!currentUser || currentUser.role !== 'counselor') return [];
+    const cId = currentUser.id;
+    const cName = currentUser.name?.toLowerCase().trim();
+
+    return allVeterans.filter(v => {
+      const vCounselorId = v.user.assignedCounselorId;
+      const vCounselorName = v.user.assignedCounselorName?.toLowerCase().trim();
+
+      const idMatch = vCounselorId && (vCounselorId === cId || cId.includes(vCounselorId) || vCounselorId.includes(cId));
+      const nameMatch = cName && vCounselorName && (vCounselorName.includes(cName) || cName.includes(vCounselorName));
+      return idMatch || nameMatch;
+    });
+  }, [allVeterans, currentUser]);
+
+  const acknowledgeInsight = async (insightId: string) => {
     setAiInsights(prev =>
       prev.map(ins => (ins.id === insightId ? { ...ins, acknowledgedByCounselor: true } : ins))
     );
+    if (currentUser && currentUser.role === 'counselor') {
+      try {
+        await apiService.acknowledgeAlert(currentUser.id, insightId);
+      } catch (e) {
+        console.warn('Counselor acknowledge alert backend sync error:', e);
+      }
+    }
+  };
+
+  const triggerEmergencyAlert = async (reason: string = 'Emergency SOS Crisis Beacon Activated') => {
+    if (!currentVeteranUser?.id) return;
+    try {
+      await apiService.sendEmergencyAlert(currentVeteranUser.id, reason);
+    } catch (e) {
+      console.warn('sendEmergencyAlert API error:', e);
+    }
+
+    const emergencyInsight: AIInsight = {
+      id: `alert-sos-${Date.now()}`,
+      veteranId: currentVeteranUser.id,
+      veteranName: currentVeteranUser.name,
+      timestamp: new Date().toLocaleString(),
+      riskLevel: 'URGENT REVIEW',
+      confidence: 'High',
+      detectedChanges: ['Emergency SOS Crisis Beacon triggered', 'Immediate clinical escalation'],
+      reasons: [reason],
+      recommendedActions: ['Initiate immediate outreach protocol', 'Contact registered emergency phone'],
+      acknowledgedByCounselor: false,
+      alertType: 'acute',
+      credibilityScore: 35.0,
+    };
+    setAiInsights(prev => [emergencyInsight, ...prev]);
   };
 
   const addCounselorNote = (veteranId: string, text: string) => {
@@ -827,6 +903,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         currentVeteranUser,
         currentVeteranProfile,
         allVeterans,
+        assignedVeterans,
+        triggerEmergencyAlert,
         tasks,
         metrics,
         aiInsights,

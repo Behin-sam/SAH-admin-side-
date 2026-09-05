@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -26,6 +26,9 @@ from app.models import (
     CheckinResponse, ConsentState, ConsentStatus,
     ReactionSignal,
 )
+from app.models.gamified import VeteranProfile, DailyTask
+from app.models.chat import CounselorProfile
+from app.engine.ai_alert_engine import evaluate_and_trigger_alerts
 from app.schemas.requests import CaseNoteUpdate, AlertAcknowledge
 from app.schemas.responses import (
     CounselorCaseSummary, AlertResponse, AlertListResponse,
@@ -360,3 +363,240 @@ async def update_case_notes(
         created_at=alert.created_at,
         acknowledged_at=alert.acknowledged_at,
     )
+
+
+# ─── Strict Caseload Isolation & AI Alert Feed Endpoints ─────────────────────
+
+async def _resolve_counselor_uuid_and_name(db: AsyncSession, counselor_id: str) -> tuple[UUID | None, str | None]:
+    """Helper to cleanly resolve counselor UUID and display name from ID or email."""
+    c_uuid = None
+    try:
+        c_uuid = UUID(counselor_id)
+    except Exception:
+        pass
+
+    c_res = await db.execute(
+        select(CounselorProfile).where(
+            (CounselorProfile.id == c_uuid) if c_uuid else (func.lower(CounselorProfile.email) == counselor_id.lower())
+        )
+    )
+    counselor = c_res.scalars().first()
+    if counselor:
+        c_uuid = counselor.id
+        return c_uuid, counselor.name
+
+    return c_uuid, None
+
+
+@router.get("/assigned-veterans")
+async def get_assigned_veterans(counselor_id: str, db: AsyncSession = Depends(get_db)):
+    """List all veterans assigned specifically to this counselor."""
+    c_uuid, c_name = await _resolve_counselor_uuid_and_name(db, counselor_id)
+
+    conditions = []
+    if c_uuid:
+        conditions.append(VeteranProfile.assigned_counselor_id == c_uuid)
+    if c_name:
+        conditions.append(func.lower(VeteranProfile.assigned_counselor_name) == c_name.lower())
+
+    # Also match via CounselorCaseAssignment
+    if c_uuid:
+        subq = select(CounselorCaseAssignment.survivor_id).where(
+            CounselorCaseAssignment.counselor_id == c_uuid,
+            CounselorCaseAssignment.is_active == True,
+        )
+        conditions.append(VeteranProfile.survivor_id.in_(subq))
+
+    if not conditions:
+        return {"counselor_id": str(counselor_id), "veterans": [], "total": 0}
+
+    query = (
+        select(VeteranProfile, SurvivorProfile)
+        .join(SurvivorProfile, VeteranProfile.survivor_id == SurvivorProfile.id)
+        .where(or_(*conditions))
+    )
+    result = await db.execute(query)
+    rows = result.all()
+
+    veterans = []
+    for vet, surv in rows:
+        veterans.append({
+            "id": str(vet.id),
+            "survivor_id": str(surv.id),
+            "name": surv.preferred_language or "Veteran",
+            "rank": vet.rank or "Soldier",
+            "service_branch": vet.service_branch or "Army",
+            "total_points": vet.total_points or 50,
+            "current_streak": vet.current_streak or 0,
+            "tasks_completed": vet.tasks_completed or 0,
+            "credibility_score": vet.credibility_score if vet.credibility_score is not None else 85.0,
+            "stability_score": vet.stability_score if vet.stability_score is not None else 85.0,
+            "assigned_counselor_id": str(vet.assigned_counselor_id) if vet.assigned_counselor_id else str(counselor_id),
+            "assigned_counselor_name": vet.assigned_counselor_name or c_name,
+            "avatarUrl": vet.avatar_url or "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200",
+        })
+
+    return {"counselor_id": str(counselor_id), "veterans": veterans, "total": len(veterans)}
+
+
+@router.get("/alerts-feed")
+async def get_counselor_alerts_feed(counselor_id: str, db: AsyncSession = Depends(get_db)):
+    """List enriched explainable AI alerts strictly for this counselor."""
+    c_uuid, _ = await _resolve_counselor_uuid_and_name(db, counselor_id)
+    if not c_uuid:
+        return {"alerts": [], "total": 0}
+
+    query = select(Alert).where(Alert.counselor_id == c_uuid).order_by(Alert.status.asc(), Alert.created_at.desc()).limit(50)
+    result = await db.execute(query)
+    alerts = result.scalars().all()
+
+    feed = []
+    for alert in alerts:
+        s_res = await db.execute(select(SurvivorProfile).where(SurvivorProfile.id == alert.survivor_id))
+        surv = s_res.scalar_one_or_none()
+
+        v_res = await db.execute(select(VeteranProfile).where(VeteranProfile.survivor_id == alert.survivor_id))
+        vet = v_res.scalar_one_or_none()
+
+        v_name = surv.preferred_language if (surv and surv.preferred_language) else "Veteran"
+        feed.append({
+            "id": str(alert.id),
+            "veteran_id": str(vet.id) if vet else str(alert.survivor_id),
+            "survivor_id": str(alert.survivor_id),
+            "veteran_name": v_name,
+            "alert_type": alert.alert_type,
+            "status": alert.status.value if hasattr(alert.status, "value") else str(alert.status),
+            "severity_score": alert.severity_score,
+            "trend_summary": alert.trend_summary,
+            "contributing_topics": alert.contributing_topics or [],
+            "credibility_score": vet.credibility_score if (vet and vet.credibility_score is not None) else 85.0,
+            "created_at": alert.created_at.isoformat() if alert.created_at else None,
+            "acknowledged_at": alert.acknowledged_at.isoformat() if alert.acknowledged_at else None,
+        })
+
+    return {"alerts": feed, "total": len(feed)}
+
+
+@router.post("/alerts/{alert_id}/acknowledge")
+async def acknowledge_alert_feed(counselor_id: str, alert_id: str, db: AsyncSession = Depends(get_db)):
+    """Acknowledge an alert."""
+    a_uuid = None
+    try:
+        a_uuid = UUID(alert_id)
+    except Exception:
+        pass
+
+    result = await db.execute(select(Alert).where((Alert.id == a_uuid) if a_uuid else (Alert.id == str(alert_id))))
+    alert = result.scalar_one_or_none()
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+
+    alert.status = AlertStatus.ACKNOWLEDGED
+    alert.acknowledged_at = datetime.now(timezone.utc)
+    await db.commit()
+    return {"success": True, "alert_id": str(alert.id), "status": "acknowledged"}
+
+
+@router.get("/veteran/{veteran_id}/dossier")
+async def get_veteran_dossier_strictly_assigned(
+    counselor_id: str,
+    veteran_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Enforces strict clinical confidentiality and authorization.
+    Only the counselor assigned to this client may access the clinical dossier."""
+    v_uuid = None
+    try:
+        v_uuid = UUID(veteran_id)
+    except Exception:
+        pass
+
+    v_res = await db.execute(
+        select(VeteranProfile).where(
+            (VeteranProfile.id == v_uuid) if v_uuid else (VeteranProfile.id == str(veteran_id))
+        )
+    )
+    vet = v_res.scalar_one_or_none()
+    if not vet:
+        raise HTTPException(status_code=404, detail="Veteran not found")
+
+    c_uuid = None
+    try:
+        c_uuid = UUID(counselor_id)
+    except Exception:
+        pass
+
+    is_assigned = False
+    if vet.assigned_counselor_id and (
+        str(vet.assigned_counselor_id) == str(counselor_id) or (c_uuid and vet.assigned_counselor_id == c_uuid)
+    ):
+        is_assigned = True
+
+    if not is_assigned:
+        ca_res = await db.execute(
+            select(CounselorCaseAssignment).where(
+                CounselorCaseAssignment.survivor_id == vet.survivor_id,
+                (CounselorCaseAssignment.counselor_id == c_uuid) if c_uuid else (CounselorCaseAssignment.counselor_id == str(counselor_id)),
+                CounselorCaseAssignment.is_active == True,
+            )
+        )
+        if ca_res.scalar_one_or_none():
+            is_assigned = True
+
+    if not is_assigned:
+        raise HTTPException(
+            status_code=403,
+            detail="Access Denied: You are not the assigned clinical specialist for this veteran. Client records are protected under clinical confidentiality.",
+        )
+
+    s_res = await db.execute(select(SurvivorProfile).where(SurvivorProfile.id == vet.survivor_id))
+    surv = s_res.scalar_one_or_none()
+
+    return {
+        "authorized": True,
+        "veteran": {
+            "id": str(vet.id),
+            "name": surv.preferred_language if surv else "Veteran",
+            "rank": vet.rank,
+            "service_branch": vet.service_branch,
+            "total_points": vet.total_points,
+            "current_streak": vet.current_streak,
+            "tasks_completed": vet.tasks_completed,
+            "credibility_score": vet.credibility_score,
+            "stability_score": vet.stability_score,
+            "assigned_counselor_id": str(vet.assigned_counselor_id) if vet.assigned_counselor_id else None,
+            "assigned_counselor_name": vet.assigned_counselor_name,
+        }
+    }
+
+
+@router.post("/veteran/{veteran_id}/evaluate-alerts")
+async def evaluate_veteran_alerts(
+    counselor_id: str,
+    veteran_id: str,
+    event: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """Trigger AI credibility and emergency alert evaluation for this veteran."""
+    v_uuid = None
+    try:
+        v_uuid = UUID(veteran_id)
+    except Exception:
+        pass
+
+    if not v_uuid:
+        v_res = await db.execute(select(VeteranProfile))
+        vet = v_res.scalars().first()
+        v_uuid = vet.id if vet else None
+
+    if not v_uuid:
+        raise HTTPException(status_code=404, detail="Veteran not found")
+
+    alert = await evaluate_and_trigger_alerts(db, v_uuid, trigger_event=event)
+    return {
+        "success": True,
+        "alert_triggered": alert is not None,
+        "alert_id": str(alert.id) if alert else None,
+        "trend_summary": alert.trend_summary if alert else "Baseline stable; no alert triggered.",
+    }
+

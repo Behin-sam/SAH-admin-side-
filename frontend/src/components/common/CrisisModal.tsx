@@ -3,9 +3,25 @@ import { X, PhoneCall, ShieldAlert, HeartHandshake, Wind, CheckCircle2 } from 'l
 import { useApp } from '../../context/AppContext';
 
 export const CrisisModal: React.FC = () => {
-  const { isCrisisModalOpen, setIsCrisisModalOpen, currentVeteranUser } = useApp();
+  const { isCrisisModalOpen, setIsCrisisModalOpen, currentVeteranUser, triggerEmergencyAlert } = useApp();
   const [requestedCallback, setRequestedCallback] = useState(false);
   const [activeGrounding, setActiveGrounding] = useState(false);
+  const [isNotifying, setIsNotifying] = useState(false);
+
+  const counselorName = currentVeteranUser?.assignedCounselorName || 'Your assigned specialist';
+
+  const handleNotifyCounselor = async () => {
+    setIsNotifying(true);
+    try {
+      await triggerEmergencyAlert('Crisis Support Requested: Veteran clicked Emergency Callback in 24/7 Crisis Modal');
+      setRequestedCallback(true);
+    } catch (e) {
+      console.error('Failed to dispatch crisis emergency alert:', e);
+      setRequestedCallback(true);
+    } finally {
+      setIsNotifying(false);
+    }
+  };
 
   if (!isCrisisModalOpen) return null;
 
@@ -78,20 +94,21 @@ export const CrisisModal: React.FC = () => {
               </div>
               {requestedCallback ? (
                 <span className="text-xs font-bold text-[#D96B27] flex items-center gap-1">
-                  <CheckCircle2 className="w-4 h-4" /> Alert Sent
+                  <CheckCircle2 className="w-4 h-4" /> Alert Dispatched
                 </span>
               ) : (
                 <button
-                  onClick={() => setRequestedCallback(true)}
-                  className="px-4 py-2 rounded-xl bg-[#D96B27] hover:bg-[#C55A1A] text-white text-xs font-bold transition-all shadow-rust"
+                  onClick={handleNotifyCounselor}
+                  disabled={isNotifying}
+                  className="px-4 py-2 rounded-xl bg-[#D96B27] hover:bg-[#C55A1A] text-white text-xs font-bold transition-all shadow-rust disabled:opacity-50"
                 >
-                  Notify Counselor
+                  {isNotifying ? 'Alerting...' : 'Notify Counselor'}
                 </button>
               )}
             </div>
             {requestedCallback && (
               <p className="text-[11px] text-[#8C4A1E] bg-[#F7DFCC] p-2.5 rounded-xl border border-[#E8DCCE]">
-                Dr. Ananya Nair has been alerted with top priority to call your registered number.
+                <strong>{counselorName}</strong> has been alerted with top priority to review your file and reach out immediately.
               </p>
             )}
           </div>

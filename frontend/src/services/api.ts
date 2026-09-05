@@ -86,6 +86,34 @@ export const apiService = {
     });
   },
 
+  async getAssignedVeterans(counselorId: string) {
+    return request<{ counselor_id: string; veterans: any[]; total: number }>(`/counselors/${counselorId}/assigned-veterans`);
+  },
+
+  async getCounselorAlerts(counselorId: string) {
+    return request<{ alerts: any[]; total: number }>(`/counselors/${counselorId}/alerts-feed`);
+  },
+
+  async acknowledgeAlert(counselorId: string, alertId: string) {
+    return request<any>(`/counselors/${counselorId}/alerts/${alertId}/acknowledge`, {
+      method: 'POST',
+    });
+  },
+
+  async sendEmergencyAlert(veteranId: string, content: string = 'URGENT: Crisis assistance requested.') {
+    return request<any>(`/veterans/${veteranId}/chat/emergency`, {
+      method: 'POST',
+      body: JSON.stringify({ content }),
+    });
+  },
+
+  async evaluateCredibility(veteranId: string, event?: string) {
+    return request<any>(`/veterans/${veteranId}/evaluate-credibility`, {
+      method: 'POST',
+      body: JSON.stringify({ event }),
+    });
+  },
+
   // Veteran Endpoints
   async getVeteranDashboard(veteranId: string) {
     return request<any>(`/veterans/${veteranId}/dashboard`);
@@ -132,16 +160,6 @@ export const apiService = {
   // Counselor Endpoints
   async getCounselorCases(counselorId: string) {
     return request<any[]>(`/counselors/${counselorId}/cases`);
-  },
-
-  async getCounselorAlerts(counselorId: string) {
-    return request<any[]>(`/counselors/${counselorId}/alerts`);
-  },
-
-  async acknowledgeAlert(counselorId: string, alertId: string) {
-    return request<any>(`/counselors/${counselorId}/alerts/${alertId}/ack`, {
-      method: 'POST',
-    });
   },
 
   // Direct Messaging

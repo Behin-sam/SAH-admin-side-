@@ -61,6 +61,8 @@ export interface VeteranProfile {
   level: number;
   badges: Badge[];
   currentRiskLevel: RiskLevel;
+  credibilityScore?: number;
+  stabilityScore?: number;
 }
 
 export interface Badge {
@@ -124,6 +126,8 @@ export interface AIInsight {
   reasons: string[];
   recommendedActions: string[];
   acknowledgedByCounselor: boolean;
+  credibilityScore?: number;
+  alertType?: string;
 }
 
 export interface NotificationItem {

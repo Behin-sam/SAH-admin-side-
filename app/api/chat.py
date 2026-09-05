@@ -15,12 +15,14 @@ from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.models import CounselorCaseAssignment
 from app.models.gamified import VeteranProfile
 from app.models.chat import (
     ChatConversation,
     ChatMessage,
     CounselorProfile,
 )
+from app.engine.ai_alert_engine import evaluate_and_trigger_alerts
 
 router = APIRouter(tags=["chat"])
 
@@ -262,17 +264,47 @@ async def send_emergency_message(
     payload: dict,
     db: AsyncSession = Depends(get_db),
 ):
-    """Send an emergency SOS alert to counselor."""
+    """Send an emergency SOS alert to counselor and trigger AI alert engine."""
     content = payload.get("content", "URGENT: Crisis assistance requested.")
 
-    # Find conversation
+    # Find veteran and their assigned counselor
+    v_res = await db.execute(select(VeteranProfile).where(VeteranProfile.id == veteran_id))
+    veteran = v_res.scalar_one_or_none()
+
+    counselor_uuid = getattr(veteran, "assigned_counselor_id", None)
+    counselor_name = getattr(veteran, "assigned_counselor_name", None)
+
+    # If not on profile, check conversation
+    if not counselor_uuid:
+        result = await db.execute(
+            select(ChatConversation)
+            .where(ChatConversation.veteran_id == veteran_id)
+            .order_by(ChatConversation.created_at.desc())
+        )
+        conversation = result.scalars().first()
+        if conversation and conversation.counselor_id:
+            counselor_uuid = conversation.counselor_id
+
+    # Fallback to first active counselor
+    if not counselor_uuid:
+        c_res = await db.execute(select(CounselorProfile).order_by(CounselorProfile.created_at.asc()))
+        first_c = c_res.scalars().first()
+        counselor_uuid = first_c.id if first_c else uuid.UUID("c0000000-0000-0000-0000-000000000001")
+        if first_c and not counselor_name:
+            counselor_name = first_c.name
+
+    if not counselor_name:
+        c_res2 = await db.execute(select(CounselorProfile).where(CounselorProfile.id == counselor_uuid))
+        c_found = c_res2.scalar_one_or_none()
+        counselor_name = c_found.name if c_found else "Assigned Clinical Specialist"
+
+    # Find or create conversation
     result = await db.execute(
         select(ChatConversation)
-        .where(ChatConversation.veteran_id == veteran_id)
+        .where(ChatConversation.veteran_id == veteran_id, ChatConversation.counselor_id == counselor_uuid)
         .order_by(ChatConversation.created_at.desc())
     )
     conversation = result.scalars().first()
-    counselor_uuid = uuid.UUID("c0000000-0000-0000-0000-000000000001")
 
     if not conversation:
         conversation = ChatConversation(
@@ -298,10 +330,17 @@ async def send_emergency_message(
     conversation.last_message_at = datetime.now(timezone.utc)
     await db.commit()
 
+    # Trigger AI Alert Engine
+    created_alert = await evaluate_and_trigger_alerts(
+        db, veteran_id, trigger_event="EMERGENCY_SOS", event_details={"content": content}
+    )
+
     return {
         "id": str(msg.id),
-        "message": "Emergency notification transmitted to clinical caregiver Dr. Ananya Nair.",
-        "counselor_name": "Dr. Ananya Nair",
+        "alert_id": str(created_alert.id) if created_alert else None,
+        "message": f"Emergency notification transmitted to clinical caregiver {counselor_name}.",
+        "counselor_name": counselor_name,
+        "counselor_id": str(counselor_uuid),
         "status": "alert_dispatched",
     }
 
@@ -425,6 +464,30 @@ async def choose_counselor(
     else:
         conv.status = "active"
         conv.last_message_at = now
+
+    # Also bind counselor directly to VeteranProfile and CounselorCaseAssignment
+    v_res = await db.execute(select(VeteranProfile).where(VeteranProfile.id == target_vet_id))
+    vet = v_res.scalar_one_or_none()
+    if vet:
+        vet.assigned_counselor_id = c_uuid
+        vet.assigned_counselor_name = c_name
+
+        ca_res = await db.execute(
+            select(CounselorCaseAssignment).where(
+                CounselorCaseAssignment.survivor_id == vet.survivor_id,
+                CounselorCaseAssignment.counselor_id == c_uuid,
+            )
+        )
+        ca = ca_res.scalar_one_or_none()
+        if not ca:
+            ca = CounselorCaseAssignment(
+                survivor_id=vet.survivor_id,
+                counselor_id=c_uuid,
+                is_active=True,
+            )
+            db.add(ca)
+        else:
+            ca.is_active = True
 
     await db.commit()
 
