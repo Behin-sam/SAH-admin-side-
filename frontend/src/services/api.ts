@@ -235,6 +235,13 @@ export const apiService = {
     return request<{ group_id: string; members: any[]; count: number }>(`/groups/${groupId}/members`);
   },
 
+  async awardMemberPoints(groupId: string, memberVeteranId: string, data: { leader_id: string; points?: number; reason?: string; task_id?: string }) {
+    return request<any>(`/groups/${groupId}/members/${memberVeteranId}/award-points`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
   async getGroupMessages(groupId: string) {
     return request<{ group_id: string; messages: any[] }>(`/groups/${groupId}/messages`);
   },

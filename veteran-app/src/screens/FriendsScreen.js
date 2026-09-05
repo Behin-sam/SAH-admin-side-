@@ -148,6 +148,7 @@ const FriendsScreen = ({ navigation }) => {
   const filteredFriends = friends.filter((f) => {
     const q = searchQuery.toLowerCase();
     return (
+      (f.name && f.name.toLowerCase().includes(q)) ||
       (f.rank && f.rank.toLowerCase().includes(q)) ||
       (f.service_branch && f.service_branch.toLowerCase().includes(q))
     );
@@ -281,12 +282,12 @@ const FriendsScreen = ({ navigation }) => {
                     ]}
                   >
                     <Text style={styles.avatarInitials}>
-                      {friend.rank ? friend.rank.slice(0, 2).toUpperCase() : 'CO'}
+                      {(friend.name || friend.rank || 'CO').slice(0, 2).toUpperCase()}
                     </Text>
                   </View>
                   <View style={styles.cardInfo}>
-                    <Text style={styles.cardTitle}>{friend.rank || 'Comrade'}</Text>
-                    <Text style={styles.cardSubtitle}>{friend.service_branch || 'Indian Armed Forces'}</Text>
+                    <Text style={styles.cardTitle}>{friend.name || friend.rank || 'Comrade'}</Text>
+                    <Text style={styles.cardSubtitle}>{friend.name ? `${friend.rank} • ` : ''}{friend.service_branch || 'Indian Armed Forces'}</Text>
                     <View style={styles.statsRow}>
                       <View style={styles.statPill}>
                         <Ionicons name="trophy" size={11} color="#D97706" />
@@ -310,7 +311,7 @@ const FriendsScreen = ({ navigation }) => {
 
                   <TouchableOpacity
                     style={styles.messageBtn}
-                    onPress={() => navigation.navigate('DM', { friendId: friend.id, friendName: friend.rank })}
+                    onPress={() => navigation.navigate('DM', { friendId: friend.id, friendName: friend.name || friend.rank })}
                     activeOpacity={0.85}
                   >
                     <Ionicons name="chatbubbles" size={14} color="#fff" style={{ marginRight: 6 }} />
@@ -342,12 +343,12 @@ const FriendsScreen = ({ navigation }) => {
                       ]}
                     >
                       <Text style={styles.avatarInitials}>
-                        {req.rank ? req.rank.slice(0, 2).toUpperCase() : 'CO'}
+                        {(req.name || req.rank || 'CO').slice(0, 2).toUpperCase()}
                       </Text>
                     </View>
                     <View style={styles.cardInfo}>
-                      <Text style={styles.cardTitle}>{req.rank || 'Comrade'}</Text>
-                      <Text style={styles.cardSubtitle}>{req.service_branch || 'Armed Forces'}</Text>
+                      <Text style={styles.cardTitle}>{req.name || req.rank || 'Comrade'}</Text>
+                      <Text style={styles.cardSubtitle}>{req.name ? `${req.rank} • ` : ''}{req.service_branch || 'Armed Forces'}</Text>
                       <Text style={styles.requestedTimeText}>Wants to join your comrades squad</Text>
                     </View>
                   </View>
@@ -355,7 +356,7 @@ const FriendsScreen = ({ navigation }) => {
                   <View style={styles.requestActionRow}>
                     <TouchableOpacity
                       style={styles.declineBtn}
-                      onPress={() => handleRespondRequest(req.request_id, 'reject', req.rank)}
+                      onPress={() => handleRespondRequest(req.request_id, 'reject', req.name || req.rank)}
                       disabled={isBusy}
                     >
                       <Text style={styles.declineBtnText}>Decline</Text>
@@ -363,7 +364,7 @@ const FriendsScreen = ({ navigation }) => {
 
                     <TouchableOpacity
                       style={styles.acceptBtn}
-                      onPress={() => handleRespondRequest(req.request_id, 'accept', req.rank)}
+                      onPress={() => handleRespondRequest(req.request_id, 'accept', req.name || req.rank)}
                       disabled={isBusy}
                     >
                       {isBusy ? (
@@ -402,12 +403,12 @@ const FriendsScreen = ({ navigation }) => {
                     ]}
                   >
                     <Text style={styles.avatarInitials}>
-                      {veteran.rank ? veteran.rank.slice(0, 2).toUpperCase() : 'V'}
+                      {(veteran.name || veteran.rank || 'V').slice(0, 2).toUpperCase()}
                     </Text>
                   </View>
                   <View style={styles.cardInfo}>
-                    <Text style={styles.cardTitle}>{veteran.rank || 'Soldier'}</Text>
-                    <Text style={styles.cardSubtitle}>{veteran.service_branch || 'Armed Forces'}</Text>
+                    <Text style={styles.cardTitle}>{veteran.name || veteran.rank || 'Soldier'}</Text>
+                    <Text style={styles.cardSubtitle}>{veteran.name ? `${veteran.rank} • ` : ''}{veteran.service_branch || 'Armed Forces'}</Text>
                     <View style={styles.statsRow}>
                       <View style={styles.statPill}>
                         <Ionicons name="trophy" size={11} color="#D97706" />
@@ -425,7 +426,7 @@ const FriendsScreen = ({ navigation }) => {
                   {isAlreadyFriend ? (
                     <TouchableOpacity
                       style={[styles.messageBtn, { backgroundColor: theme.colors.cream[400] }]}
-                      onPress={() => navigation.navigate('DM', { friendId: veteran.id, friendName: veteran.rank })}
+                      onPress={() => navigation.navigate('DM', { friendId: veteran.id, friendName: veteran.name || veteran.rank })}
                     >
                       <Ionicons name="chatbubbles" size={14} color={theme.colors.espresso[800]} style={{ marginRight: 6 }} />
                       <Text style={[styles.messageBtnText, { color: theme.colors.espresso[800] }]}>Chat</Text>

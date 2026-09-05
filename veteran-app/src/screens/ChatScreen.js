@@ -24,7 +24,7 @@ import { chatAPI } from '../services/api';
 
 const ChatScreen = ({ route, navigation }) => {
   const { user } = useAuth();
-  const { counselorName = 'Dr. Ananya Nair' } = route.params || {};
+  const counselorName = route?.params?.counselorName || user?.assigned_counselor_name || user?.counselor_name || 'Dr. Ananya Nair';
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(true);
@@ -58,7 +58,7 @@ const ChatScreen = ({ route, navigation }) => {
         {
           id: 'm1',
           sender_type: 'counselor',
-          content: "Hello! I'm Dr. Ananya Nair, your clinical supervisor. Feel free to reach out here anytime for support, grounding guidance, or care questions.",
+          content: `Hello! I'm ${counselorName}, your clinical supervisor. Feel free to reach out here anytime for support, grounding guidance, or care questions.`,
           created_at: new Date(Date.now() - 3600000).toISOString(),
         }
       ]);
@@ -68,7 +68,7 @@ const ChatScreen = ({ route, navigation }) => {
         {
           id: 'm1',
           sender_type: 'counselor',
-          content: "Hello! I'm Dr. Ananya Nair, your clinical supervisor. Feel free to reach out here anytime for support, grounding guidance, or care questions.",
+          content: `Hello! I'm ${counselorName}, your clinical supervisor. Feel free to reach out here anytime for support, grounding guidance, or care questions.`,
           created_at: new Date(Date.now() - 3600000).toISOString(),
         }
       ]);
@@ -207,7 +207,9 @@ const ChatScreen = ({ route, navigation }) => {
       <View style={styles.headerBar}>
         <View style={styles.counselorInfo}>
           <View style={styles.avatarMini}>
-            <Text style={styles.avatarMiniText}>AN</Text>
+            <Text style={styles.avatarMiniText}>
+              {(counselorName || 'CL').replace(/[^A-Za-z]/g, '').slice(0, 2).toUpperCase()}
+            </Text>
           </View>
           <View>
             <Text style={styles.counselorName}>{counselorName}</Text>
@@ -248,7 +250,7 @@ const ChatScreen = ({ route, navigation }) => {
       <View style={styles.inputContainer}>
         <TextInput
           style={styles.input}
-          placeholder="Message Dr. Ananya Nair..."
+          placeholder={`Message ${counselorName}...`}
           placeholderTextColor={theme.colors.espresso[400]}
           value={inputText}
           onChangeText={setInputText}

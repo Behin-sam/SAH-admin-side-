@@ -17,7 +17,8 @@ import {
   Filter,
   X,
   Clock,
-  Sparkles
+  Sparkles,
+  Trophy
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { apiService } from '../../services/api';
@@ -44,6 +45,7 @@ interface ActivityItem {
   points_per_participant: number;
   status: string;
   participants_count: number;
+  completed_count: number;
 }
 
 interface MessageItem {
@@ -65,6 +67,8 @@ interface MemberItem {
   role: string;
   total_points: number;
   current_streak: number;
+  completed_tasks_count?: number;
+  has_finished_task?: boolean;
 }
 
 export const SquadsView: React.FC = () => {
@@ -114,6 +118,7 @@ export const SquadsView: React.FC = () => {
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [joinedActivities, setJoinedActivities] = useState<Record<string, boolean>>({});
   const [completedActivities, setCompletedActivities] = useState<Record<string, boolean>>({});
+  const [awardingMemberId, setAwardingMemberId] = useState<string | null>(null);
 
   const vetId = activeVeteranId || currentUser?.id || 'vet-01';
 
@@ -237,6 +242,33 @@ export const SquadsView: React.FC = () => {
       // Do NOT award points on API failure — show error instead
       console.warn('Activity complete error:', e);
       alert('Could not log completion. Please check your connection and try again.');
+    }
+  };
+
+  // Squad Leader: Award points to member who completed a task
+  const handleAwardPoints = async (member: MemberItem) => {
+    if (!selectedSquad || awardingMemberId) return;
+    if (!member.has_finished_task) {
+      alert(`Cannot award points to ${member.name}: Comrade must finish a squad drill or daily task first.`);
+      return;
+    }
+
+    setAwardingMemberId(member.veteran_id);
+    try {
+      const res = await apiService.awardMemberPoints(selectedSquad.id, member.veteran_id, {
+        leader_id: vetId,
+        points: 15,
+        reason: `Squad Leader Commendation for drill completion`,
+      });
+      alert(res?.message || `Successfully awarded 15 XP to ${member.name}! 🎖️`);
+      setSquadMembers(prev =>
+        prev.map(m => (m.veteran_id === member.veteran_id ? { ...m, total_points: (m.total_points || 0) + 15 } : m))
+      );
+    } catch (err: any) {
+      const detail = err?.message || 'Failed to award points. Member must finish a task first.';
+      alert(`Notice: ${detail}`);
+    } finally {
+      setAwardingMemberId(null);
     }
   };
 
@@ -774,43 +806,85 @@ export const SquadsView: React.FC = () => {
                       Loading comrade roster...
                     </div>
                   ) : (
-                    squadMembers.map((member, idx) => (
-                      <div
-                        key={member.veteran_id || idx}
-                        className="border border-[#E8DCCE] rounded-2xl p-3 bg-white flex items-center justify-between"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-xl bg-[#F5EBE0] flex items-center justify-center font-bold text-xs text-[#1C1917]">
-                            {(member.name || 'V').charAt(0)}
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-xs font-bold text-[#1C1917]">{member.name}</span>
-                              {member.role === 'admin' && (
-                                <span className="px-1 py-0.2 rounded bg-amber-100 text-amber-800 text-[9px] font-bold">
-                                  Lead
-                                </span>
-                              )}
-                            </div>
-                            <span className="text-[10px] text-[#786F68] block">
-                              {member.rank || 'Soldier'} • {member.service_branch || 'Veteran'}
-                            </span>
-                          </div>
-                        </div>
+                    squadMembers.map((member, idx) => {
+                      const isSquadLeader =
+                        (selectedSquad as any)?.created_by === vetId ||
+                        squadMembers.some((m) => m.veteran_id === vetId && (m.role === 'admin' || m.role === 'leader'));
+                      const isSelf = member.veteran_id === vetId;
 
-                        <div className="text-right">
-                          <span className="text-xs font-extrabold text-[#D96B27] block">
-                            {member.total_points || 0} XP
-                          </span>
-                          {member.current_streak ? (
-                            <span className="text-[10px] text-[#786F68] flex items-center justify-end gap-0.5">
-                              <Flame className="w-3 h-3 text-[#D96B27]" />
-                              {member.current_streak}d
-                            </span>
-                          ) : null}
+                      return (
+                        <div
+                          key={member.veteran_id || idx}
+                          className="border border-[#E8DCCE] rounded-2xl p-3 bg-white flex flex-col justify-between"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="w-9 h-9 rounded-xl bg-[#F5EBE0] flex items-center justify-center font-bold text-xs text-[#1C1917]">
+                                {(member.name || 'V').charAt(0)}
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-xs font-bold text-[#1C1917]">{member.name}</span>
+                                  {member.role === 'admin' && (
+                                    <span className="px-1 py-0.2 rounded bg-amber-100 text-amber-800 text-[9px] font-bold">
+                                      Lead
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="text-[10px] text-[#786F68] block">
+                                  {member.rank || 'Soldier'} • {member.service_branch || 'Veteran'}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="text-right">
+                              <span className="text-xs font-extrabold text-[#D96B27] block">
+                                {member.total_points || 0} XP
+                              </span>
+                              {member.current_streak ? (
+                                <span className="text-[10px] text-[#786F68] flex items-center justify-end gap-0.5">
+                                  <Flame className="w-3 h-3 text-[#D96B27]" />
+                                  {member.current_streak}d
+                                </span>
+                              ) : null}
+                            </div>
+                          </div>
+
+                          {/* Leader Task Points Award Action */}
+                          {isSquadLeader && !isSelf && (
+                            <div className="mt-2.5 pt-2 border-t border-[#F5EBE0] flex items-center justify-between">
+                              <span className="text-[10px] text-[#786F68]">
+                                {member.has_finished_task ? (
+                                  <span className="text-emerald-700 font-semibold flex items-center gap-1">
+                                    <CheckCircle2 className="w-3 h-3" /> Drill Finished ({member.completed_tasks_count || 1})
+                                  </span>
+                                ) : (
+                                  <span className="text-amber-700 font-medium">Task required to award points</span>
+                                )}
+                              </span>
+
+                              <button
+                                onClick={() => handleAwardPoints(member)}
+                                disabled={!member.has_finished_task || awardingMemberId === member.veteran_id}
+                                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
+                                  member.has_finished_task
+                                    ? 'bg-[#D96B27] hover:bg-[#C55A1A] text-white shadow-xs'
+                                    : 'bg-[#F5EBE0] text-[#786F68] cursor-not-allowed opacity-70'
+                                }`}
+                                title={
+                                  member.has_finished_task
+                                    ? 'Award squad points for task completion'
+                                    : 'Comrade must finish a drill or task before leader can award points'
+                                }
+                              >
+                                <Trophy className="w-3 h-3" />
+                                {awardingMemberId === member.veteran_id ? 'Awarding...' : 'Award +15 XP'}
+                              </button>
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               )}

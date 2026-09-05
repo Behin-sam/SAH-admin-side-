@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
+from pydantic import BaseModel
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select, func
@@ -38,6 +39,8 @@ from app.models.gamified import (
     GroupRole,
     InteractionType,
     TaskType,
+    DailyTask,
+    TaskStatus,
 )
 
 router = APIRouter(tags=["groups"])
@@ -314,9 +317,16 @@ async def leave_group(
     return {"message": "Left the group", "group_id": str(group_id)}
 
 
+class AwardPointsRequest(BaseModel):
+    leader_id: uuid.UUID
+    points: int = 15
+    task_id: uuid.UUID | None = None
+    reason: str | None = None
+
+
 @router.get("/api/groups/{group_id}/members")
 async def list_members(group_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
-    """List group members with real names and ranks."""
+    """List group members with real names, ranks, and task completion status."""
     result = await db.execute(
         select(GroupMembership, VeteranProfile, SurvivorProfile)
         .join(VeteranProfile, GroupMembership.veteran_id == VeteranProfile.id)
@@ -326,8 +336,32 @@ async def list_members(group_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
             GroupMembership.is_active == True,
         )
     )
-    members = [
-        {
+    rows = result.all()
+    members = []
+    for m, v, surv in rows:
+        # Check completed daily tasks
+        dt_res = await db.execute(
+            select(func.count(DailyTask.id)).where(
+                DailyTask.veteran_id == v.id,
+                DailyTask.status == TaskStatus.COMPLETED,
+            )
+        )
+        dt_count = dt_res.scalar() or 0
+
+        # Check completed group activities
+        ga_res = await db.execute(
+            select(func.count(GroupActivityParticipant.id))
+            .join(GroupActivity, GroupActivityParticipant.activity_id == GroupActivity.id)
+            .where(
+                GroupActivity.group_id == group_id,
+                GroupActivityParticipant.veteran_id == v.id,
+                GroupActivityParticipant.status == "completed",
+            )
+        )
+        ga_count = ga_res.scalar() or 0
+        total_completed = dt_count + ga_count
+
+        members.append({
             "veteran_id": str(m.veteran_id),
             "name": (surv.full_name or surv.username or "Comrade") if surv else "Comrade",
             "rank": v.rank or "Soldier",
@@ -336,14 +370,154 @@ async def list_members(group_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
             "joined_at": m.joined_at.isoformat(),
             "total_points": v.total_points,
             "current_streak": v.current_streak,
-        }
-        for m, v, surv in result.all()
-    ]
+            "completed_tasks_count": total_completed,
+            "has_finished_task": total_completed > 0,
+        })
 
     return {
         "group_id": str(group_id),
         "members": members,
         "count": len(members),
+    }
+
+
+@router.post("/api/groups/{group_id}/members/{veteran_id}/award-points")
+async def award_member_points(
+    group_id: uuid.UUID,
+    veteran_id: uuid.UUID,
+    payload: AwardPointsRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Allow a group leader / admin to award points to a member ONLY IF the member has completed a task.
+    """
+    # 1. Verify group exists
+    group_res = await db.execute(select(VeteranGroup).where(VeteranGroup.id == group_id))
+    group = group_res.scalar_one_or_none()
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found")
+
+    # 2. Verify caller is a leader/admin of the group (or group creator)
+    leader_res = await db.execute(
+        select(GroupMembership).where(
+            GroupMembership.group_id == group_id,
+            GroupMembership.veteran_id == payload.leader_id,
+            GroupMembership.is_active == True,
+        )
+    )
+    leader_membership = leader_res.scalar_one_or_none()
+    is_admin = False
+    if leader_membership:
+        role_val = leader_membership.role.value if hasattr(leader_membership.role, 'value') else str(leader_membership.role)
+        if role_val in ("admin", "moderator", "leader"):
+            is_admin = True
+    if not is_admin and group.created_by == payload.leader_id:
+        is_admin = True
+
+    if not is_admin:
+        raise HTTPException(status_code=403, detail="Only squad leaders and administrators can award points to members.")
+
+    # 3. Verify target veteran is active member
+    member_res = await db.execute(
+        select(GroupMembership).where(
+            GroupMembership.group_id == group_id,
+            GroupMembership.veteran_id == veteran_id,
+            GroupMembership.is_active == True,
+        )
+    )
+    member_membership = member_res.scalar_one_or_none()
+    if not member_membership:
+        raise HTTPException(status_code=404, detail="Comrade is not an active member of this squad.")
+
+    # 4. Check if member has completed a task
+    completed_task_title = None
+    if payload.task_id:
+        dt_res = await db.execute(
+            select(DailyTask).where(
+                DailyTask.id == payload.task_id,
+                DailyTask.veteran_id == veteran_id,
+                DailyTask.status == TaskStatus.COMPLETED,
+            )
+        )
+        dt = dt_res.scalar_one_or_none()
+        if dt:
+            completed_task_title = dt.title
+        else:
+            gap_res = await db.execute(
+                select(GroupActivityParticipant, GroupActivity)
+                .join(GroupActivity, GroupActivityParticipant.activity_id == GroupActivity.id)
+                .where(
+                    GroupActivityParticipant.id == payload.task_id,
+                    GroupActivityParticipant.veteran_id == veteran_id,
+                    GroupActivityParticipant.status == "completed",
+                )
+            )
+            gap_row = gap_res.first()
+            if gap_row:
+                completed_task_title = gap_row[1].title
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Specified task is not completed by this member. Points can only be awarded when a task is finished."
+                )
+    else:
+        # Check group activities in this squad first
+        squad_act_res = await db.execute(
+            select(GroupActivityParticipant, GroupActivity)
+            .join(GroupActivity, GroupActivityParticipant.activity_id == GroupActivity.id)
+            .where(
+                GroupActivity.group_id == group_id,
+                GroupActivityParticipant.veteran_id == veteran_id,
+                GroupActivityParticipant.status == "completed",
+            )
+        )
+        squad_act = squad_act_res.first()
+        if squad_act:
+            completed_task_title = squad_act[1].title
+        else:
+            # Check any daily task completed by veteran
+            dt_res = await db.execute(
+                select(DailyTask).where(
+                    DailyTask.veteran_id == veteran_id,
+                    DailyTask.status == TaskStatus.COMPLETED,
+                ).limit(1)
+            )
+            dt = dt_res.scalar_one_or_none()
+            if dt:
+                completed_task_title = dt.title
+
+    if not completed_task_title:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot award points: Member has not finished any tasks or drills yet. Group leader can only award points when a member finishes a task."
+        )
+
+    # 5. Award points
+    points_to_award = max(1, min(payload.points, 100))
+    award_reason = payload.reason or f"Squad Leader Commendation for completing: {completed_task_title}"
+
+    vet_res = await db.execute(select(VeteranProfile).where(VeteranProfile.id == veteran_id))
+    vet = vet_res.scalar_one()
+    vet.total_points += points_to_award
+
+    group.total_group_points += points_to_award
+
+    ledger = PointsLedger(
+        veteran_id=veteran_id,
+        points=points_to_award,
+        reason=award_reason,
+        category="leader_commendation",
+    )
+    db.add(ledger)
+    await db.commit()
+
+    return {
+        "success": True,
+        "message": f"Successfully awarded {points_to_award} XP to comrade for finishing: {completed_task_title}! 🎖️",
+        "points_awarded": points_to_award,
+        "veteran_total_points": vet.total_points,
+        "group_total_points": group.total_group_points,
+        "task_completed": completed_task_title,
     }
 
 

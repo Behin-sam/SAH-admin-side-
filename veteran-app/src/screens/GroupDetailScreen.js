@@ -55,8 +55,43 @@ const GroupDetailScreen = ({ route, navigation }) => {
   const [drillPoints, setDrillPoints] = useState(20);
   const [drillDuration, setDrillDuration] = useState(30);
   const [creatingDrill, setCreatingDrill] = useState(false);
+  const [awardingMemberId, setAwardingMemberId] = useState(null);
 
   const storageKey = user?.id ? `@sah_my_groups_${user.id}` : null;
+
+  const handleAwardPoints = async (member) => {
+    if (awardingMemberId || !user?.id) return;
+    if (!member.has_finished_task) {
+      const msg = `Cannot award points: ${member.name || 'Comrade'} must finish a squad drill or daily task before leader can award points.`;
+      if (Platform.OS === 'web') window.alert(msg);
+      else Alert.alert('Task Required', msg);
+      return;
+    }
+
+    setAwardingMemberId(member.veteran_id);
+    try {
+      const res = await groupAPI.awardMemberPoints(groupId, member.veteran_id, {
+        leader_id: user.id,
+        points: 15,
+        reason: 'Squad Leader Commendation for drill completion',
+      });
+      const msg = res?.data?.message || res?.message || `Successfully awarded 15 XP to ${member.name}! 🎖️`;
+      if (Platform.OS === 'web') window.alert(msg);
+      else Alert.alert('Points Awarded! 🎖️', msg);
+
+      setMembers((prev) =>
+        prev.map((m) =>
+          m.veteran_id === member.veteran_id ? { ...m, total_points: (m.total_points || 0) + 15 } : m
+        )
+      );
+    } catch (err) {
+      const detail = err.response?.data?.detail || err.message || 'Could not award points.';
+      if (Platform.OS === 'web') window.alert(`Notice: ${detail}`);
+      else Alert.alert('Notice', detail);
+    } finally {
+      setAwardingMemberId(null);
+    }
+  };
 
   const handleCreateDrill = async () => {
     if (!drillTitle.trim()) {
@@ -716,40 +751,84 @@ const GroupDetailScreen = ({ route, navigation }) => {
             ) : (
               members.map((member, idx) => {
                 const isAdmin = member.role === 'admin' || member.role === 'leader';
+                const isLeader =
+                  group?.created_by === user?.id ||
+                  members.some((m) => m.veteran_id === user?.id && (m.role === 'admin' || m.role === 'leader'));
+                const isSelf = member.veteran_id === user?.id;
+
                 return (
-                  <View key={member.veteran_id || idx} style={styles.memberCard}>
-                    <View style={[styles.memberAvatarCircle, isAdmin && styles.adminAvatarCircle]}>
-                      <Text style={[styles.memberAvatarInitial, isAdmin && styles.adminAvatarInitial]}>
-                        {(member.name || 'V').charAt(0).toUpperCase()}
-                      </Text>
-                    </View>
-
-                    <View style={styles.memberInfoCol}>
-                      <View style={styles.memberNameRow}>
-                        <Text style={styles.memberFullName}>{member.name || `Comrade ${idx + 1}`}</Text>
-                        {isAdmin && (
-                          <View style={styles.adminRoleTag}>
-                            <Ionicons name="star" size={10} color={theme.colors.peach[800]} />
-                            <Text style={styles.adminRoleTagText}>Squad Admin</Text>
-                          </View>
-                        )}
+                  <View key={member.veteran_id || idx} style={styles.memberCardContainer}>
+                    <View style={styles.memberCard}>
+                      <View style={[styles.memberAvatarCircle, isAdmin && styles.adminAvatarCircle]}>
+                        <Text style={[styles.memberAvatarInitial, isAdmin && styles.adminAvatarInitial]}>
+                          {(member.name || 'V').charAt(0).toUpperCase()}
+                        </Text>
                       </View>
-                      <Text style={styles.memberSubDetails}>
-                        {member.rank || 'Soldier'} • {member.service_branch || 'Veteran Cohort'}
-                      </Text>
-                    </View>
 
-                    <View style={styles.memberStatsCol}>
-                      <View style={styles.memberPointsBadge}>
-                        <Text style={styles.memberPointsVal}>{member.total_points || 0} XP</Text>
-                      </View>
-                      {member.current_streak ? (
-                        <View style={styles.memberStreakRow}>
-                          <Ionicons name="flame" size={12} color={theme.colors.rust[500]} />
-                          <Text style={styles.memberStreakVal}>{member.current_streak}d streak</Text>
+                      <View style={styles.memberInfoCol}>
+                        <View style={styles.memberNameRow}>
+                          <Text style={styles.memberFullName}>{member.name || `Comrade ${idx + 1}`}</Text>
+                          {isAdmin && (
+                            <View style={styles.adminRoleTag}>
+                              <Ionicons name="star" size={10} color={theme.colors.peach[800]} />
+                              <Text style={styles.adminRoleTagText}>Squad Admin</Text>
+                            </View>
+                          )}
                         </View>
-                      ) : null}
+                        <Text style={styles.memberSubDetails}>
+                          {member.rank || 'Soldier'} • {member.service_branch || 'Veteran Cohort'}
+                        </Text>
+                      </View>
+
+                      <View style={styles.memberStatsCol}>
+                        <View style={styles.memberPointsBadge}>
+                          <Text style={styles.memberPointsVal}>{member.total_points || 0} XP</Text>
+                        </View>
+                        {member.current_streak ? (
+                          <View style={styles.memberStreakRow}>
+                            <Ionicons name="flame" size={12} color={theme.colors.rust[500]} />
+                            <Text style={styles.memberStreakVal}>{member.current_streak}d streak</Text>
+                          </View>
+                        ) : null}
+                      </View>
                     </View>
+
+                    {/* Squad Leader: Award Points if member finished task */}
+                    {isLeader && !isSelf && (
+                      <View style={styles.leaderAwardRow}>
+                        <Text style={styles.leaderAwardStatusText}>
+                          {member.has_finished_task ? (
+                            `🎖️ Drill Finished (${member.completed_tasks_count || 1})`
+                          ) : (
+                            '🔒 Task required to award points'
+                          )}
+                        </Text>
+                        <TouchableOpacity
+                          style={[
+                            styles.awardBtn,
+                            !member.has_finished_task && styles.awardBtnDisabled,
+                          ]}
+                          onPress={() => handleAwardPoints(member)}
+                          disabled={!member.has_finished_task || awardingMemberId === member.veteran_id}
+                          activeOpacity={0.8}
+                        >
+                          <Ionicons
+                            name="trophy"
+                            size={12}
+                            color={member.has_finished_task ? '#fff' : theme.colors.espresso[400]}
+                            style={{ marginRight: 4 }}
+                          />
+                          <Text
+                            style={[
+                              styles.awardBtnText,
+                              !member.has_finished_task && styles.awardBtnTextDisabled,
+                            ]}
+                          >
+                            {awardingMemberId === member.veteran_id ? 'Awarding...' : 'Award +15 XP'}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
                   </View>
                 );
               })
@@ -1347,15 +1426,50 @@ const styles = StyleSheet.create({
   },
 
   // Roster
-  memberCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  memberCardContainer: {
     backgroundColor: theme.colors.cream[50],
     borderRadius: 12,
     padding: 12,
     marginBottom: 8,
     borderWidth: 1,
     borderColor: theme.colors.cream[400],
+  },
+  memberCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  leaderAwardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.cream[300],
+  },
+  leaderAwardStatusText: {
+    fontSize: 11,
+    color: theme.colors.espresso[500],
+    fontWeight: '500',
+  },
+  awardBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.rust[500],
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  awardBtnDisabled: {
+    backgroundColor: theme.colors.cream[300],
+  },
+  awardBtnText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  awardBtnTextDisabled: {
+    color: theme.colors.espresso[400],
   },
   memberAvatarCircle: {
     width: 42,

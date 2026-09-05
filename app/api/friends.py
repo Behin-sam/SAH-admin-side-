@@ -19,7 +19,7 @@ from sqlalchemy import select, text, or_, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models.gamified import VeteranProfile
-from app.models.chat import ChatMessage
+from app.models import SurvivorProfile
 
 router = APIRouter(tags=["friends"])
 
@@ -44,6 +44,31 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+async def _ensure_tables(db: AsyncSession):
+    await db.execute(text("""
+        CREATE TABLE IF NOT EXISTS friend_requests (
+            id TEXT PRIMARY KEY,
+            requester_id TEXT NOT NULL,
+            receiver_id TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+    """))
+    await db.execute(text("""
+        CREATE TABLE IF NOT EXISTS direct_messages (
+            id TEXT PRIMARY KEY,
+            sender_id TEXT NOT NULL,
+            receiver_id TEXT NOT NULL,
+            content TEXT NOT NULL,
+            is_read BOOLEAN DEFAULT 0,
+            created_at TEXT NOT NULL
+        );
+    """))
+    await db.execute(text("CREATE INDEX IF NOT EXISTS ix_dm_pair ON direct_messages(sender_id, receiver_id);"))
+    await db.commit()
+
+
 async def _get_vet(db: AsyncSession, vid: uuid.UUID) -> VeteranProfile:
     r = await db.execute(select(VeteranProfile).where(VeteranProfile.id == vid))
     v = r.scalar_one_or_none()
@@ -54,11 +79,18 @@ async def _get_vet(db: AsyncSession, vid: uuid.UUID) -> VeteranProfile:
 
 async def _vet_dict(db: AsyncSession, vid: str) -> dict:
     try:
-        r = await db.execute(select(VeteranProfile).where(VeteranProfile.id == uuid.UUID(vid)))
-        v = r.scalar_one_or_none()
-        if v:
+        r = await db.execute(
+            select(VeteranProfile, SurvivorProfile)
+            .outerjoin(SurvivorProfile, VeteranProfile.survivor_id == SurvivorProfile.id)
+            .where(VeteranProfile.id == uuid.UUID(vid))
+        )
+        row = r.first()
+        if row:
+            v, surv = row
+            v_name = (surv.preferred_language if surv and surv.preferred_language else None) or getattr(surv, "full_name", None) or v.rank or "Veteran"
             return {
                 "id": str(v.id),
+                "name": v_name,
                 "rank": v.rank or "Soldier",
                 "service_branch": v.service_branch or "Indian Armed Forces",
                 "total_points": v.total_points,
@@ -67,7 +99,7 @@ async def _vet_dict(db: AsyncSession, vid: str) -> dict:
             }
     except Exception:
         pass
-    return {"id": vid, "rank": "Unknown", "service_branch": "Unknown", "total_points": 0, "current_streak": 0}
+    return {"id": vid, "name": "Comrade", "rank": "Unknown", "service_branch": "Unknown", "total_points": 0, "current_streak": 0}
 
 
 # ── Accepted friends ───────────────────────────────────────────────────────────
@@ -75,6 +107,7 @@ async def _vet_dict(db: AsyncSession, vid: str) -> dict:
 @router.get("/api/veterans/{veteran_id}/friends")
 async def get_friends(veteran_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     """Return accepted friends for this veteran."""
+    await _ensure_tables(db)
     vid = str(veteran_id)
     rows = await db.execute(text(
         "SELECT id, requester_id, receiver_id, created_at FROM friend_requests "
@@ -95,6 +128,7 @@ async def get_friends(veteran_id: uuid.UUID, db: AsyncSession = Depends(get_db))
 @router.get("/api/veterans/{veteran_id}/friend-requests")
 async def get_friend_requests(veteran_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     """Return incoming pending friend requests."""
+    await _ensure_tables(db)
     vid = str(veteran_id)
     rows = await db.execute(text(
         "SELECT id, requester_id, created_at FROM friend_requests "
@@ -216,6 +250,7 @@ async def discover_veterans(
     db: AsyncSession = Depends(get_db),
 ):
     """Discover other veterans not yet friended."""
+    await _ensure_tables(db)
     vid = str(veteran_id)
 
     # Get IDs already in a relationship
@@ -228,20 +263,27 @@ async def discover_veterans(
         excluded.add(row[0])
         excluded.add(row[1])
 
-    result = await db.execute(select(VeteranProfile).where(VeteranProfile.id != veteran_id).limit(50))
-    veterans = result.scalars().all()
+    result = await db.execute(
+        select(VeteranProfile, SurvivorProfile)
+        .outerjoin(SurvivorProfile, VeteranProfile.survivor_id == SurvivorProfile.id)
+        .where(VeteranProfile.id != veteran_id)
+        .limit(50)
+    )
+    rows = result.all()
 
     out = []
-    for v in veterans:
+    for v, surv in rows:
         sid = str(v.id)
         if sid in excluded:
             continue
+        v_name = (surv.preferred_language if surv and surv.preferred_language else None) or getattr(surv, "full_name", None) or v.rank or "Veteran"
         if search:
             s = search.lower()
-            if s not in (v.rank or "").lower() and s not in (v.service_branch or "").lower():
+            if s not in v_name.lower() and s not in (v.rank or "").lower() and s not in (v.service_branch or "").lower():
                 continue
         out.append({
             "id": sid,
+            "name": v_name,
             "rank": v.rank or "Soldier",
             "service_branch": v.service_branch or "Indian Armed Forces",
             "total_points": v.total_points,
@@ -263,32 +305,29 @@ async def get_dm_thread(
     db: AsyncSession = Depends(get_db),
 ):
     """Get DM conversation between two veterans."""
-    result = await db.execute(
-        select(ChatMessage).where(
-            ChatMessage.sender_type == "dm",
-            or_(
-                and_(
-                    ChatMessage.veteran_id == veteran_id,
-                    ChatMessage.counselor_id == str(other_veteran_id),
-                ),
-                and_(
-                    ChatMessage.veteran_id == other_veteran_id,
-                    ChatMessage.counselor_id == str(veteran_id),
-                ),
-            )
-        ).order_by(ChatMessage.created_at.asc())
+    await _ensure_tables(db)
+    vid = str(veteran_id)
+    oid = str(other_veteran_id)
+    rows = await db.execute(
+        text(
+            "SELECT id, sender_id, receiver_id, content, created_at FROM direct_messages "
+            "WHERE (sender_id=:v AND receiver_id=:o) OR (sender_id=:o AND receiver_id=:v) "
+            "ORDER BY created_at ASC"
+        ),
+        {"v": vid, "o": oid}
     )
-    messages = result.scalars().all()
+    entries = rows.fetchall()
     return {
         "messages": [
             {
-                "id": str(m.id),
-                "sender_id": str(m.veteran_id),
-                "content": m.content,
-                "created_at": m.created_at.isoformat(),
-                "is_mine": m.veteran_id == veteran_id,
+                "id": row[0],
+                "sender_id": row[1],
+                "receiver_id": row[2],
+                "content": row[3],
+                "created_at": row[4],
+                "is_mine": row[1] == vid,
             }
-            for m in messages
+            for row in entries
         ]
     }
 
@@ -301,15 +340,26 @@ async def send_dm(
     db: AsyncSession = Depends(get_db),
 ):
     """Send a DM to another veteran."""
+    await _ensure_tables(db)
     if not body.content.strip():
         raise HTTPException(status_code=400, detail="Message cannot be empty")
-    msg = ChatMessage(
-        veteran_id=veteran_id,
-        counselor_id=str(other_veteran_id),
-        content=body.content.strip(),
-        sender_type="dm",
+    vid = str(veteran_id)
+    oid = str(other_veteran_id)
+    msg_id = str(uuid.uuid4())
+    now = datetime.now(timezone.utc).isoformat()
+
+    await db.execute(
+        text(
+            "INSERT INTO direct_messages (id, sender_id, receiver_id, content, is_read, created_at) "
+            "VALUES (:id, :sender_id, :receiver_id, :content, 0, :created_at)"
+        ),
+        {
+            "id": msg_id,
+            "sender_id": vid,
+            "receiver_id": oid,
+            "content": body.content.strip(),
+            "created_at": now,
+        }
     )
-    db.add(msg)
     await db.commit()
-    ts = msg.created_at.isoformat() if msg.created_at else _now()
-    return {"id": str(msg.id), "message": "Sent!", "created_at": ts}
+    return {"id": msg_id, "message": "Sent!", "created_at": now}

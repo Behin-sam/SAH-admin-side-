@@ -145,6 +145,10 @@ export const groupAPI = {
   // Get group members
   getMembers: (groupId) => api.get(`/groups/${groupId}/members`),
 
+  // Award points to group member (group leader only, requires finished task)
+  awardMemberPoints: (groupId, memberVeteranId, data) =>
+    api.post(`/groups/${groupId}/members/${memberVeteranId}/award-points`, data),
+
   // List group activities
   getActivities: (groupId) => api.get(`/groups/${groupId}/activities`),
 

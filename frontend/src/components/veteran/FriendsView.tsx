@@ -21,6 +21,7 @@ import { apiService } from '../../services/api';
 
 interface Friend {
   id: string;
+  name?: string;
   rank: string;
   service_branch: string;
   total_points: number;
@@ -32,6 +33,7 @@ interface Friend {
 interface FriendRequest {
   id: string;
   request_id: string;
+  name?: string;
   rank: string;
   service_branch: string;
   total_points: number;
@@ -50,6 +52,7 @@ interface DMMessage {
 
 interface DiscoverVet {
   id: string;
+  name?: string;
   rank: string;
   service_branch: string;
   total_points: number;
@@ -339,11 +342,11 @@ export const FriendsView: React.FC = () => {
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="w-11 h-11 rounded-full bg-[#F7DFCC] text-[#8C4A1E] flex items-center justify-center font-bold font-heading text-sm shrink-0">
-                        {friend.rank ? friend.rank.slice(0, 2).toUpperCase() : 'CO'}
+                        {(friend.name || friend.rank || 'CO').slice(0, 2).toUpperCase()}
                       </div>
                       <div className="min-w-0">
-                        <h3 className="font-bold text-sm text-[#1C1917] truncate">{friend.rank}</h3>
-                        <p className="text-xs text-[#786F68] truncate">{friend.service_branch}</p>
+                        <h3 className="font-bold text-sm text-[#1C1917] truncate">{friend.name || friend.rank}</h3>
+                        <p className="text-xs text-[#786F68] truncate">{friend.rank ? `${friend.rank} • ` : ''}{friend.service_branch}</p>
                         <div className="flex items-center gap-3 mt-1 text-[11px] text-[#786F68]">
                           <span className="flex items-center gap-1 font-bold text-[#D96B27]">
                             <Trophy className="w-3 h-3" /> {friend.total_points || 0} XP
@@ -403,11 +406,11 @@ export const FriendsView: React.FC = () => {
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="w-11 h-11 rounded-full bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-sm shrink-0">
-                        {req.rank ? req.rank.slice(0, 2).toUpperCase() : 'CO'}
+                        {(req.name || req.rank || 'CO').slice(0, 2).toUpperCase()}
                       </div>
                       <div className="min-w-0">
-                        <h3 className="font-bold text-sm text-[#1C1917] truncate">{req.rank}</h3>
-                        <p className="text-xs text-[#786F68] truncate">{req.service_branch}</p>
+                        <h3 className="font-bold text-sm text-[#1C1917] truncate">{req.name || req.rank}</h3>
+                        <p className="text-xs text-[#786F68] truncate">{req.rank ? `${req.rank} • ` : ''}{req.service_branch}</p>
                         <p className="text-[11px] text-amber-700 mt-0.5">Invited you to connect</p>
                       </div>
                     </div>
@@ -457,11 +460,11 @@ export const FriendsView: React.FC = () => {
                     >
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="w-11 h-11 rounded-full bg-[#EFE8DE] text-[#1C1917] flex items-center justify-center font-bold text-sm shrink-0">
-                          {vet.rank ? vet.rank.slice(0, 2).toUpperCase() : 'V'}
+                          {(vet.name || vet.rank || 'V').slice(0, 2).toUpperCase()}
                         </div>
                         <div className="min-w-0">
-                          <h3 className="font-bold text-sm text-[#1C1917] truncate">{vet.rank}</h3>
-                          <p className="text-xs text-[#786F68] truncate">{vet.service_branch}</p>
+                          <h3 className="font-bold text-sm text-[#1C1917] truncate">{vet.name || vet.rank}</h3>
+                          <p className="text-xs text-[#786F68] truncate">{vet.rank ? `${vet.rank} • ` : ''}{vet.service_branch}</p>
                           <div className="flex items-center gap-3 mt-1 text-[11px] text-[#786F68]">
                             <span className="flex items-center gap-1 font-bold text-[#D96B27]">
                               <Trophy className="w-3 h-3" /> {vet.total_points || 0} XP
@@ -518,11 +521,11 @@ export const FriendsView: React.FC = () => {
             <div className="p-4 border-b border-[#E8DCCE] flex items-center justify-between bg-[#FAF3EC] rounded-t-2xl">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-full bg-[#8C4A1E] text-white flex items-center justify-center font-bold text-xs">
-                  {activeDM.rank.slice(0, 2).toUpperCase()}
+                  {(activeDM.name || activeDM.rank).slice(0, 2).toUpperCase()}
                 </div>
                 <div>
-                  <h3 className="font-bold text-sm text-[#1C1917]">{activeDM.rank}</h3>
-                  <p className="text-[11px] text-[#786F68]">{activeDM.service_branch}</p>
+                  <h3 className="font-bold text-sm text-[#1C1917]">{activeDM.name || activeDM.rank}</h3>
+                  <p className="text-[11px] text-[#786F68]">{activeDM.name ? `${activeDM.rank} • ` : ''}{activeDM.service_branch}</p>
                 </div>
               </div>
               <button
