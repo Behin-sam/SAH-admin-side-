@@ -42,42 +42,67 @@ function MainTabs() {
       screenOptions={({ route }) => ({
         tabBarIcon: ({ focused, color, size }) => {
           let iconName;
-          if (route.name === 'Dashboard') iconName = focused ? 'home' : 'home-outline';
+          if (route.name === 'Dashboard') iconName = focused ? 'shield' : 'shield-outline';
           else if (route.name === 'Tasks') iconName = focused ? 'checkbox' : 'checkbox-outline';
           else if (route.name === 'Groups') iconName = focused ? 'people' : 'people-outline';
           else if (route.name === 'Friends') iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
           else if (route.name === 'Points') iconName = focused ? 'trophy' : 'trophy-outline';
           else if (route.name === 'Profile') iconName = focused ? 'person' : 'person-outline';
-          return <Ionicons name={iconName} size={size} color={color} />;
+          return (
+            <View style={{
+              alignItems: 'center',
+              justifyContent: 'center',
+              paddingHorizontal: 8,
+              paddingVertical: 2,
+              borderRadius: 12,
+              backgroundColor: focused ? '#F7DFCC' : 'transparent',
+            }}>
+              <Ionicons name={iconName} size={20} color={focused ? '#8C4A1E' : '#786F68'} />
+            </View>
+          );
         },
-        tabBarActiveTintColor: theme.colors.rust[500],
-        tabBarInactiveTintColor: theme.colors.espresso[400],
+        tabBarActiveTintColor: '#8C4A1E',
+        tabBarInactiveTintColor: '#786F68',
+        tabBarLabelStyle: {
+          fontSize: 10,
+          fontWeight: '700',
+          marginTop: -2,
+        },
         tabBarStyle: {
-          backgroundColor: theme.colors.cream[100],
-          borderTopColor: theme.colors.cream[400],
+          backgroundColor: '#FFFFFF',
+          borderTopColor: '#E8DCCE',
           borderTopWidth: 1,
+          height: Platform.OS === 'ios' ? 86 : 64,
+          paddingBottom: Platform.OS === 'ios' ? 28 : 8,
+          paddingTop: 6,
+          shadowColor: '#282524',
+          shadowOffset: { width: 0, height: -3 },
+          shadowOpacity: 0.05,
+          shadowRadius: 10,
+          elevation: 8,
         },
         headerStyle: {
-          backgroundColor: theme.colors.cream[200],
-          borderBottomColor: theme.colors.cream[400],
+          backgroundColor: '#FFFFFF',
+          borderBottomColor: '#E8DCCE',
           borderBottomWidth: 1,
           elevation: 0,
           shadowOpacity: 0,
         },
-        headerTintColor: theme.colors.espresso[900],
+        headerTintColor: '#1C1917',
         headerTitleStyle: {
-          fontWeight: '800',
-          fontSize: 18,
-          color: theme.colors.espresso[900],
+          fontWeight: '900',
+          fontSize: 17,
+          color: '#1C1917',
+          letterSpacing: -0.3,
         },
       })}
     >
-      <Tab.Screen name="Dashboard" component={DashboardScreen} />
-      <Tab.Screen name="Tasks" component={TasksScreen} />
-      <Tab.Screen name="Groups" component={GroupsScreen} />
-      <Tab.Screen name="Friends" component={FriendsScreen} />
-      <Tab.Screen name="Points" component={PointsScreen} />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
+      <Tab.Screen name="Dashboard" component={DashboardScreen} options={{ headerTitle: 'VALOR Headquarters' }} />
+      <Tab.Screen name="Tasks" component={TasksScreen} options={{ headerTitle: 'Daily Recovery Drills' }} />
+      <Tab.Screen name="Groups" component={GroupsScreen} options={{ headerTitle: 'Squadrons & Units' }} />
+      <Tab.Screen name="Friends" component={FriendsScreen} options={{ headerTitle: 'Comrades & Comms' }} />
+      <Tab.Screen name="Points" component={PointsScreen} options={{ headerTitle: 'Valor Vault & Honors' }} />
+      <Tab.Screen name="Profile" component={ProfileScreen} options={{ headerTitle: 'Veteran Dossier' }} />
     </Tab.Navigator>
   );
 }

@@ -1,9 +1,13 @@
 /**
- * Tasks Screen
- * Shows all daily tasks with filters for type and status
+ * VALOR Tasks Screen (Recovery Drills & Missions)
+ * Complete Mobile Front-End Remake
+ * - Tactical Category Filters (Mental, Physical GPS, Social Squad, Completed)
+ * - Harvard Trauma Protocol Daily Banner
+ * - Enhanced Mission Cards with GPS Target verification
+ * - Dynamic XP & Streak Synchronization
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -22,24 +26,83 @@ import { theme } from '../constants/theme';
 import { taskAPI } from '../services/api';
 import { storage } from '../services/storage';
 
+const DEFAULT_MOCK_TASKS = [
+  {
+    id: '1',
+    type: 'mental',
+    title: '5-4-3-2-1 Grounding Technique',
+    description: 'Practice the 5-4-3-2-1 senses check during anxiety, tension, or combat flashbacks.',
+    points: 15,
+    status: 'assigned',
+    difficulty: 1,
+    category: 'grounding',
+    gps_required: false,
+  },
+  {
+    id: '2',
+    type: 'physical',
+    title: 'Brisk 30-Minute Grounding Walk',
+    description: 'Elevate heart rate and boost bilateral stimulation with GPS-verified movement.',
+    points: 25,
+    status: 'assigned',
+    difficulty: 2,
+    category: 'cardio',
+    gps_required: true,
+    gps_target_distance_meters: 1000,
+  },
+  {
+    id: '3',
+    type: 'mental',
+    title: 'Cognitive Reframing Journal',
+    description: 'Challenge a combat anxiety thought pattern by writing down a grounded perspective.',
+    points: 20,
+    status: 'assigned',
+    difficulty: 2,
+    category: 'reframing',
+    gps_required: false,
+  },
+  {
+    id: '4',
+    type: 'social',
+    title: 'Squad Community Check-In',
+    description: 'Leave an encouraging word for your Morning Walkers recovery squad.',
+    points: 15,
+    status: 'assigned',
+    difficulty: 1,
+    category: 'social',
+    gps_required: false,
+  },
+  {
+    id: '5',
+    type: 'mental',
+    title: 'Box Breathing Sleep Protocol',
+    description: '4-4-4-4 diaphragmatic breathing session to calm sympathetic nervous tone before bed.',
+    points: 15,
+    status: 'assigned',
+    difficulty: 1,
+    category: 'breathing',
+    gps_required: false,
+  },
+];
+
+const FILTERS = [
+  { id: 'all', label: 'All Drills', icon: 'apps' },
+  { id: 'mental', label: 'Mental Grounding', icon: 'brain' },
+  { id: 'physical', label: 'Physical GPS', icon: 'walk' },
+  { id: 'social', label: 'Social Squad', icon: 'people' },
+  { id: 'completed', label: 'Completed', icon: 'checkmark-circle' },
+  { id: 'pending', label: 'Pending', icon: 'time' },
+];
+
 const TasksScreen = ({ navigation }) => {
   const { user, updatePoints } = useAuth();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState('all');
   const [tasks, setTasks] = useState([]);
+  const [completingId, setCompletingId] = useState(null);
 
-  useEffect(() => {
-    loadTasks();
-  }, [user]);
-
-  useFocusEffect(
-    React.useCallback(() => {
-      loadTasks();
-    }, [user])
-  );
-
-  const loadTasks = async () => {
+  const loadTasks = useCallback(async () => {
     try {
       if (user?.id) {
         try {
@@ -58,6 +121,7 @@ const TasksScreen = ({ navigation }) => {
                   difficulty: t.difficulty || 1,
                   category: t.category || 'wellness',
                   gps_required: t.gps_required,
+                  gps_target_distance_meters: t.gps_target_distance_meters || 1000,
                 };
               })
             );
@@ -70,67 +134,9 @@ const TasksScreen = ({ navigation }) => {
           console.warn('Live task fetch fallback:', apiErr.message);
         }
       }
-      // 5 Curated daily recovery tasks
-      const mockTasks = [
-        {
-          id: '1',
-          type: 'mental',
-          title: '5-4-3-2-1 Grounding Technique',
-          description: 'Practice the 5-4-3-2-1 senses check during anxiety, tension, or combat flashbacks.',
-          points: 15,
-          status: 'assigned',
-          difficulty: 1,
-          category: 'grounding',
-          gps_required: false,
-        },
-        {
-          id: '2',
-          type: 'physical',
-          title: 'Brisk 30-Minute Grounding Walk',
-          description: 'Elevate heart rate and boost bilateral stimulation with GPS-verified movement.',
-          points: 25,
-          status: 'assigned',
-          difficulty: 2,
-          category: 'cardio',
-          gps_required: true,
-          gps_target_distance_meters: 1000,
-        },
-        {
-          id: '3',
-          type: 'mental',
-          title: 'Cognitive Reframing Journal',
-          description: 'Challenge a combat anxiety thought pattern by writing down a grounded perspective.',
-          points: 20,
-          status: 'assigned',
-          difficulty: 2,
-          category: 'cognitive',
-          gps_required: false,
-        },
-        {
-          id: '4',
-          type: 'social',
-          title: 'Squad Community Peer Check-In',
-          description: 'Leave an encouraging word for your Morning Walkers recovery squad.',
-          points: 15,
-          status: 'assigned',
-          difficulty: 1,
-          category: 'peer_support',
-          gps_required: false,
-        },
-        {
-          id: '5',
-          type: 'mental',
-          title: 'Box Breathing Sleep Protocol',
-          description: '4-4-4-4 diaphragmatic breathing session to calm sympathetic nervous tone before bed.',
-          points: 15,
-          status: 'assigned',
-          difficulty: 1,
-          category: 'breathing',
-          gps_required: false,
-        },
-      ];
+
       const checkedMockTasks = await Promise.all(
-        mockTasks.map(async (t) => {
+        DEFAULT_MOCK_TASKS.map(async (t) => {
           const isDone = await storage.get(`@sah_task_done_${t.id}`);
           return isDone ? { ...t, status: 'completed' } : t;
         })
@@ -140,39 +146,58 @@ const TasksScreen = ({ navigation }) => {
       setLoading(false);
       setRefreshing(false);
     }
+  }, [user]);
+
+  useEffect(() => {
+    loadTasks();
+  }, [loadTasks]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadTasks();
+    }, [loadTasks])
+  );
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadTasks();
   };
 
   const handleQuickComplete = async (task) => {
     if (task.status === 'completed') return;
+
     if (task.gps_required) {
       navigation.navigate('GPSTracking', { taskId: task.id, task });
       return;
     }
+
+    setCompletingId(task.id);
     const pts = task.points || 15;
     try {
       if (user?.id) {
         await taskAPI.completeTask(user.id, task.id).catch(() => {});
       }
       await storage.set(`@sah_task_done_${task.id}`, 'true');
+
       if (updatePoints) {
         await updatePoints(pts);
       }
+
       setTasks((prev) =>
         prev.map((t) => (t.id === task.id ? { ...t, status: 'completed' } : t))
       );
+
+      const msg = `+${pts} Valor Points awarded! Great job staying committed.`;
       if (Platform.OS === 'web') {
-        window.alert(`Task Completed! 🎉\n\n+${pts} Valor Points awarded!`);
+        window.alert(`Drill Completed! 🎖️\n\n${msg}`);
       } else {
-        Alert.alert('Task Completed! 🎉', `+${pts} Valor Points awarded!`);
+        Alert.alert('Drill Completed! 🎖️', msg);
       }
     } catch (e) {
       console.warn('Quick complete error:', e);
+    } finally {
+      setCompletingId(null);
     }
-  };
-
-  const onRefresh = () => {
-    setRefreshing(true);
-    loadTasks();
   };
 
   const filteredTasks = tasks.filter((task) => {
@@ -182,182 +207,214 @@ const TasksScreen = ({ navigation }) => {
     return task.type === activeFilter;
   });
 
-  const getTypeColor = (type) => {
+  const getTypeTheme = (type) => {
     switch (type) {
-      case 'mental': return '#8b5cf6';
-      case 'physical': return theme.colors.rust[500];
-      case 'social': return '#3b82f6';
-      default: return '#6b7280';
+      case 'physical':
+        return { border: '#D96B27', bg: '#FFF7ED', icon: 'walk', label: 'Physical GPS', color: '#D96B27' };
+      case 'social':
+        return { border: '#059669', bg: '#F0FDF4', icon: 'people', label: 'Social Squad', color: '#059669' };
+      case 'mental':
+      default:
+        return { border: '#6366F1', bg: '#EEF2FF', icon: 'brain', label: 'Mental Grounding', color: '#6366F1' };
     }
   };
 
-  const getTypeIcon = (type) => {
-    switch (type) {
-      case 'mental': return 'brain';
-      case 'physical': return 'walk';
-      case 'social': return 'people';
-      default: return 'checkbox';
-    }
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'completed': return theme.colors.status.stable;
-      case 'in_progress': return '#3b82f6';
-      case 'assigned': return theme.colors.rust[500];
-      default: return '#6b7280';
-    }
-  };
-
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={theme.colors.rust[500]} />
-      </View>
-    );
-  }
+  const completedCount = tasks.filter((t) => t.status === 'completed').length;
+  const totalCount = tasks.length || 5;
 
   return (
     <View style={styles.container}>
-      {/* Filter Bar */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.filterContainer}
-      >
-        {['all', 'mental', 'physical', 'social', 'completed', 'pending'].map((filter) => (
-          <TouchableOpacity
-            key={filter}
-            style={[styles.filterTab, activeFilter === filter && styles.filterTabActive]}
-            onPress={() => setActiveFilter(filter)}
-          >
-            <Text
-              style={[styles.filterText, activeFilter === filter && styles.filterTextActive]}
-            >
-              {filter.charAt(0).toUpperCase() + filter.slice(1)}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      {/* Header Summary Bar */}
+      <View style={styles.headerBar}>
+        <View>
+          <Text style={styles.headerOverline}>DAILY RECOVERY PROGRAM</Text>
+          <Text style={styles.headerTitle}>Active Missions & Rituals</Text>
+        </View>
+        <View style={styles.countBadge}>
+          <Text style={styles.countBadgeText}>{completedCount}/{totalCount} Completed</Text>
+        </View>
+      </View>
 
-      {/* Tasks List */}
+      {/* Filter Horizontal Scroll */}
+      <View style={styles.filterWrapper}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterScroll}
+        >
+          {FILTERS.map((f) => {
+            const isActive = activeFilter === f.id;
+            return (
+              <TouchableOpacity
+                key={f.id}
+                style={[styles.filterChip, isActive && styles.filterChipActive]}
+                onPress={() => setActiveFilter(f.id)}
+                activeOpacity={0.8}
+              >
+                <Ionicons
+                  name={f.icon}
+                  size={14}
+                  color={isActive ? '#FFFFFF' : '#786F68'}
+                  style={{ marginRight: 5 }}
+                />
+                <Text style={[styles.filterChipText, isActive && styles.filterChipTextActive]}>
+                  {f.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+
+      {/* Main List */}
       <ScrollView
         style={styles.tasksList}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        contentContainerStyle={styles.tasksListContent}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#8C4A1E']} />}
       >
-        {/* Daily 5-Questionnaire Banner */}
+        {/* Harvard Daily Wellness Card */}
         <TouchableOpacity
-          style={styles.checkInBanner}
+          style={styles.harvardBanner}
           onPress={() => navigation.navigate('Assessment')}
           activeOpacity={0.85}
         >
-          <View style={styles.checkInIconWrap}>
-            <Ionicons name="clipboard" size={22} color={theme.colors.rust[500]} />
+          <View style={styles.harvardIconBadge}>
+            <Ionicons name="pulse" size={22} color="#8C4A1E" />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.checkInBannerTitle}>Daily 5-Question Wellness Check-In</Text>
-            <Text style={styles.checkInBannerSub}>Harvard Trauma clinical protocol • +20 Valor Points</Text>
+            <View style={styles.harvardBadgeRow}>
+              <Text style={styles.harvardBadgeText}>Harvard Protocol</Text>
+              <Text style={styles.harvardPointsBadge}>+20 XP</Text>
+            </View>
+            <Text style={styles.harvardTitle}>Daily 5-Question Check-In</Text>
+            <Text style={styles.harvardSub}>Clinical evaluation for PTSD symptom tracking</Text>
           </View>
-          <Ionicons name="arrow-forward" size={16} color={theme.colors.rust[600]} />
+          <Ionicons name="chevron-forward" size={18} color="#8C4A1E" />
         </TouchableOpacity>
 
-        {filteredTasks.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="checkbox-outline" size={64} color="#d1d5db" />
-            <Text style={styles.emptyText}>No tasks found</Text>
+        {loading ? (
+          <View style={styles.loadingBox}>
+            <ActivityIndicator size="large" color="#8C4A1E" />
+            <Text style={styles.loadingBoxText}>Syncing daily missions...</Text>
+          </View>
+        ) : filteredTasks.length === 0 ? (
+          <View style={styles.emptyBox}>
+            <Ionicons name="checkbox-outline" size={54} color="#D1D5DB" />
+            <Text style={styles.emptyBoxTitle}>No drills found</Text>
+            <Text style={styles.emptyBoxSub}>No tasks match this filter category.</Text>
           </View>
         ) : (
-          filteredTasks.map((task) => (
-            <TouchableOpacity
-              key={task.id}
-              style={styles.taskCard}
-              onPress={() => {
-                if (task.gps_required && task.status !== 'completed') {
-                  navigation.navigate('GPSTracking', { taskId: task.id, task });
-                } else {
-                  navigation.navigate('TaskDetail', { taskId: task.id, task });
-                }
-              }}
-            >
-              <View style={[styles.taskTypeIndicator, { backgroundColor: getTypeColor(task.type) }]} />
-              
-              <View style={styles.taskContent}>
-                <View style={styles.taskHeader}>
-                  <View style={styles.taskTypeBadge}>
-                    <Ionicons name={getTypeIcon(task.type)} size={16} color={getTypeColor(task.type)} />
-                    <Text style={[styles.taskTypeText, { color: getTypeColor(task.type) }]}>
-                      {task.type}
+          filteredTasks.map((task) => {
+            const isDone = task.status === 'completed';
+            const isBusy = completingId === task.id;
+            const themeInfo = getTypeTheme(task.type);
+
+            return (
+              <TouchableOpacity
+                key={task.id}
+                style={[
+                  styles.card,
+                  { borderLeftColor: isDone ? '#059669' : themeInfo.border },
+                  isDone && styles.cardDone,
+                ]}
+                onPress={() => {
+                  if (task.gps_required && !isDone) {
+                    navigation.navigate('GPSTracking', { taskId: task.id, task });
+                  } else {
+                    navigation.navigate('TaskDetail', { taskId: task.id, task });
+                  }
+                }}
+                activeOpacity={0.85}
+              >
+                <View style={styles.cardHeader}>
+                  <View style={[styles.typeBadge, { backgroundColor: themeInfo.bg }]}>
+                    <Ionicons name={themeInfo.icon} size={12} color={themeInfo.color} style={{ marginRight: 4 }} />
+                    <Text style={[styles.typeBadgeText, { color: themeInfo.color }]}>
+                      {themeInfo.label}
                     </Text>
                   </View>
-                  <View style={[styles.statusBadge, { backgroundColor: getStatusColor(task.status) + '20' }]}>
-                    <Text style={[styles.statusText, { color: getStatusColor(task.status) }]}>
-                      {task.status.replace('_', ' ')}
-                    </Text>
+
+                  <View style={styles.xpBadge}>
+                    <Ionicons name="trophy" size={11} color="#D97706" style={{ marginRight: 3 }} />
+                    <Text style={styles.xpBadgeText}>+{task.points} XP</Text>
                   </View>
                 </View>
 
-                <Text style={styles.taskTitle}>{task.title}</Text>
-                <Text style={styles.taskDescription} numberOfLines={2}>
-                  {task.description}
-                </Text>
+                <Text style={[styles.cardTitle, isDone && styles.cardTitleDone]}>{task.title}</Text>
+                <Text style={styles.cardDesc} numberOfLines={2}>{task.description}</Text>
 
-                <View style={styles.taskFooter}>
-                  <View style={styles.taskMeta}>
-                    <Text style={styles.taskPoints}>+{task.points} pts</Text>
-                    <View style={styles.difficultyContainer}>
-                      {[...Array(3)].map((_, i) => (
-                        <View
-                          key={i}
-                          style={[styles.difficultyDot, i < task.difficulty && styles.difficultyDotActive]}
-                        />
-                      ))}
-                    </View>
+                {/* Card Footer */}
+                <View style={styles.cardFooter}>
+                  <View style={styles.metaRow}>
+                    {task.gps_required ? (
+                      <View style={styles.gpsTargetChip}>
+                        <Ionicons name="navigate" size={11} color="#D96B27" style={{ marginRight: 3 }} />
+                        <Text style={styles.gpsTargetChipText}>
+                          {task.gps_target_distance_meters || 1000}m GPS Movement
+                        </Text>
+                      </View>
+                    ) : (
+                      <View style={styles.difficultyDots}>
+                        {[...Array(3)].map((_, i) => (
+                          <View
+                            key={i}
+                            style={[
+                              styles.diffDot,
+                              i < (task.difficulty || 1) && styles.diffDotActive,
+                            ]}
+                          />
+                        ))}
+                        <Text style={styles.diffLabel}>
+                          {task.difficulty === 3 ? 'Advanced' : task.difficulty === 2 ? 'Moderate' : 'Standard'}
+                        </Text>
+                      </View>
+                    )}
                   </View>
-                  {task.gps_required && (
-                    <View style={styles.gpsBadge}>
-                      <Ionicons name="location" size={14} color="#2563eb" />
-                      <Text style={styles.gpsBadgeText}>GPS Required</Text>
+
+                  {/* Actions */}
+                  {isDone ? (
+                    <View style={styles.completedBadge}>
+                      <Ionicons name="checkmark-circle" size={16} color="#059669" style={{ marginRight: 4 }} />
+                      <Text style={styles.completedBadgeText}>Completed</Text>
                     </View>
+                  ) : task.gps_required ? (
+                    <TouchableOpacity
+                      style={styles.gpsDeployBtn}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        navigation.navigate('GPSTracking', { taskId: task.id, task });
+                      }}
+                      activeOpacity={0.85}
+                    >
+                      <Ionicons name="navigate" size={13} color="#FFFFFF" style={{ marginRight: 4 }} />
+                      <Text style={styles.gpsDeployBtnText}>Deploy Walk</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity
+                      style={styles.quickDoneBtn}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        handleQuickComplete(task);
+                      }}
+                      disabled={isBusy}
+                      activeOpacity={0.85}
+                    >
+                      {isBusy ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                      ) : (
+                        <>
+                          <Ionicons name="checkmark" size={14} color="#FFFFFF" style={{ marginRight: 4 }} />
+                          <Text style={styles.quickDoneBtnText}>Complete</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
                   )}
                 </View>
-              </View>
-
-              {task.status !== 'completed' ? (
-                <TouchableOpacity
-                  style={{
-                    backgroundColor: task.gps_required ? '#2563eb' : theme.colors.rust[500],
-                    paddingHorizontal: 10,
-                    paddingVertical: 6,
-                    borderRadius: 8,
-                    marginLeft: 8,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                  }}
-                  onPress={(e) => {
-                    e?.stopPropagation?.();
-                    handleQuickComplete(task);
-                  }}
-                >
-                  <Ionicons name={task.gps_required ? "navigate" : "checkmark"} size={14} color="#fff" />
-                  <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700', marginLeft: 3 }}>
-                    {task.gps_required ? 'Track' : 'Done'}
-                  </Text>
-                </TouchableOpacity>
-              ) : (
-                <View style={{ marginLeft: 8, alignItems: 'center', justifyContent: 'center' }}>
-                  <Ionicons name="checkmark-circle" size={22} color="#16a34a" />
-                </View>
-              )}
-            </TouchableOpacity>
-          ))
+              </TouchableOpacity>
+            );
+          })
         )}
       </ScrollView>
-
-      {/* Generate Tasks Button */}
-      <TouchableOpacity style={styles.generateButton} onPress={loadTasks}>
-        <Ionicons name="refresh" size={20} color="#fff" />
-        <Text style={styles.generateButtonText}>Generate Today's Tasks</Text>
-      </TouchableOpacity>
     </View>
   );
 };
@@ -365,206 +422,298 @@ const TasksScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.cream[200],
+    backgroundColor: '#F8F9FA',
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
+  headerBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: theme.colors.cream[200],
-  },
-  filterContainer: {
-    maxHeight: 60,
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingTop: 16,
+    paddingBottom: 12,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E8DCCE',
   },
-  filterTab: {
-    paddingHorizontal: 16,
+  headerOverline: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#8C4A1E',
+    letterSpacing: 1.2,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: '#1C1917',
+    marginTop: 2,
+  },
+  countBadge: {
+    backgroundColor: '#F7DFCC',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
+  },
+  countBadgeText: {
+    color: '#8C4A1E',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  filterWrapper: {
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
     paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: theme.colors.cream[400],
-    marginRight: 8,
   },
-  filterTabActive: {
-    backgroundColor: theme.colors.rust[500],
+  filterScroll: {
+    paddingHorizontal: 16,
+    gap: 8,
   },
-  filterText: {
-    fontSize: 14,
-    color: theme.colors.espresso[900],
-    fontWeight: '600',
+  filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 10,
+    backgroundColor: '#F3F4F6',
   },
-  filterTextActive: {
-    color: '#fff',
+  filterChipActive: {
+    backgroundColor: '#8C4A1E',
+  },
+  filterChipText: {
+    fontSize: 12,
     fontWeight: '700',
+    color: '#4B5563',
+  },
+  filterChipTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '800',
   },
   tasksList: {
     flex: 1,
+  },
+  tasksListContent: {
     padding: 16,
+    paddingBottom: 40,
   },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 40,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: theme.colors.espresso[400],
-    marginTop: 12,
-  },
-  taskCard: {
+  harvardBanner: {
+    backgroundColor: '#FAF3EC',
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 1.5,
+    borderColor: '#D96B27',
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.cream[50],
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: theme.colors.cream[400],
-    marginBottom: 12,
-    ...theme.shadows.warm,
-    overflow: 'hidden',
+    marginBottom: 14,
   },
-  taskTypeIndicator: {
-    width: 4,
-    height: '100%',
+  harvardIconBadge: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
   },
-  taskContent: {
-    flex: 1,
+  harvardBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  harvardBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#8C4A1E',
+    letterSpacing: 0.8,
+  },
+  harvardPointsBadge: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#D97706',
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 6,
+  },
+  harvardTitle: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#1C1917',
+    marginTop: 2,
+  },
+  harvardSub: {
+    fontSize: 11,
+    color: '#786F68',
+    marginTop: 1,
+  },
+  loadingBox: {
+    paddingVertical: 60,
+    alignItems: 'center',
+  },
+  loadingBoxText: {
+    fontSize: 13,
+    color: '#786F68',
+    marginTop: 10,
+    fontWeight: '600',
+  },
+  emptyBox: {
+    paddingVertical: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyBoxTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#1C1917',
+    marginTop: 12,
+  },
+  emptyBoxSub: {
+    fontSize: 12,
+    color: '#786F68',
+    marginTop: 4,
+  },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
     padding: 16,
+    borderWidth: 1,
+    borderColor: '#E8DCCE',
+    borderLeftWidth: 5,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    elevation: 2,
   },
-  taskHeader: {
+  cardDone: {
+    backgroundColor: '#F9FAFB',
+    opacity: 0.85,
+  },
+  cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
   },
-  taskTypeBadge: {
+  typeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.peach[200],
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
+    paddingVertical: 3,
+    borderRadius: 8,
   },
-  taskTypeText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: theme.colors.peach[800],
-    marginLeft: 4,
-    textTransform: 'capitalize',
+  typeBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    textTransform: 'uppercase',
   },
-  statusBadge: {
+  xpBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
+    paddingVertical: 3,
+    borderRadius: 8,
   },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '700',
-    textTransform: 'capitalize',
+  xpBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#92400E',
   },
-  taskTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: theme.colors.espresso[900],
+  cardTitle: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#1C1917',
     marginBottom: 4,
   },
-  taskDescription: {
-    fontSize: 13,
-    color: theme.colors.espresso[400],
-    marginBottom: 12,
-    lineHeight: 18,
+  cardTitleDone: {
+    textDecorationLine: 'line-through',
+    color: '#786F68',
   },
-  taskFooter: {
+  cardDesc: {
+    fontSize: 12,
+    color: '#786F68',
+    lineHeight: 16,
+    marginBottom: 12,
+  },
+  cardFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+    paddingTop: 10,
   },
-  taskMeta: {
+  metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  taskPoints: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: theme.colors.rust[500],
-    marginRight: 12,
-  },
-  difficultyContainer: {
-    flexDirection: 'row',
-  },
-  difficultyDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: theme.colors.cream[400],
-    marginRight: 4,
-  },
-  difficultyDotActive: {
-    backgroundColor: theme.colors.rust[500],
-  },
-  gpsBadge: {
+  gpsTargetChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.peach[200],
+    backgroundColor: '#FFF7ED',
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 3,
     borderRadius: 6,
   },
-  gpsBadgeText: {
+  gpsTargetChipText: {
     fontSize: 11,
-    color: theme.colors.peach[800],
-    marginLeft: 4,
     fontWeight: '700',
-    textTransform: 'uppercase',
+    color: '#D96B27',
   },
-  generateButton: {
+  difficultyDots: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme.colors.rust[500],
-    margin: 16,
-    padding: 16,
-    borderRadius: 12,
-    ...theme.shadows.rustGlow,
+    gap: 4,
   },
-  generateButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '700',
-    marginLeft: 8,
+  diffDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#E5E7EB',
   },
-  checkInBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.colors.rust[50],
-    borderWidth: 1.5,
-    borderColor: theme.colors.rust[200],
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 16,
-    ...theme.shadows.card,
+  diffDotActive: {
+    backgroundColor: '#8C4A1E',
   },
-  checkInIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-    borderWidth: 1,
-    borderColor: theme.colors.rust[200],
-  },
-  checkInBannerTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: theme.colors.espresso[900],
-    letterSpacing: 0.2,
-  },
-  checkInBannerSub: {
+  diffLabel: {
     fontSize: 11,
-    color: theme.colors.rust[700],
-    marginTop: 2,
+    color: '#6B7280',
     fontWeight: '600',
+    marginLeft: 4,
+  },
+  completedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  completedBadgeText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#059669',
+  },
+  gpsDeployBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#D96B27',
+    paddingHorizontal: 13,
+    paddingVertical: 7,
+    borderRadius: 10,
+  },
+  gpsDeployBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  quickDoneBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#8C4A1E',
+    paddingHorizontal: 13,
+    paddingVertical: 7,
+    borderRadius: 10,
+  },
+  quickDoneBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '800',
   },
 });
 

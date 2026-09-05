@@ -1,14 +1,15 @@
 /**
- * VALOR Dashboard Screen
- * Mobile-friendly, trauma-informed daily journey and recovery overview
- * - Exactly 5 curated daily tasks per day (with GPS walking integration)
- * - Access to 5-question Daily Wellness Check-In (Harvard Trauma Protocol)
- * - Client Counselor Selector (Choose Dr. Nair, Dr. Varma, Dr. Kulkarni, Maj. Gen. Pillai)
- * - Quick Sign Out (Web & Native compatible)
- * - Squad and Rewards sync
+ * VALOR Headquarters (Dashboard Screen)
+ * Complete Mobile Front-End Remake
+ * - Tactical Commander Status Bar with Crisis SOS
+ * - Daily Recovery Readiness Dial & 3-Metric Bar
+ * - Harvard Trauma Protocol Daily Check-In Launchpad
+ * - 5 Curated Tactical Missions with GPS Movement Integration
+ * - Encrypted Clinical Channel with Assigned Specialist
+ * - Immediate 5-4-3-2-1 Sensory Grounding Quick Action
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -51,34 +52,36 @@ export const COUNSELORS_LIST = [
   },
   {
     id: 'c0000000-0000-0000-0000-000000000003',
-    name: 'Dr. Sneha Kulkarni, MS',
-    title: 'Mindfulness & Sleep Coach',
-    institution: 'National Institute of Mental Health',
-    specialty: 'Sleep Architecture & Stress De-escalation',
+    name: 'Dr. Maya Kulkarni, MD',
+    title: 'Clinical Neuropsychiatrist',
+    institution: 'NIMHANS Trauma Recovery Unit',
+    specialty: 'Sleep Dysregulation & Flashback Recovery',
     rating: 4.9,
-    avatar: 'SK',
-    badge: 'NIMH Specialist',
+    avatar: 'MK',
+    badge: 'Neuro-Trauma',
   },
   {
     id: 'c0000000-0000-0000-0000-000000000004',
-    name: 'Maj. Gen. (Retd) Dr. Ramesh Pillai',
-    title: 'Combat Veteran Psychiatrist',
-    institution: 'Military Wellness Council',
-    specialty: 'Transition Trauma & Peer Reintegration',
-    rating: 5.0,
-    avatar: 'RP',
-    badge: 'Combat Veteran',
+    name: 'Maj. Gen. (Retd.) K. Pillai',
+    title: 'Veteran Peer Liaison & Counselor',
+    institution: 'Armed Forces Veteran Support Command',
+    specialty: 'Combat Transition & Moral Injury',
+    rating: 4.95,
+    avatar: 'KP',
+    badge: 'Veteran Peer',
   },
 ];
 
-const DEFAULT_FIVE_TASKS = [
+export const DEFAULT_FIVE_TASKS = [
   {
     id: '1',
     type: 'mental',
     title: '5-4-3-2-1 Sensory Grounding',
     description: 'Acknowledge 5 things you see, 4 you can touch, 3 you hear, 2 you smell, 1 you taste.',
     points: 15,
-    status: 'completed',
+    status: 'assigned',
+    difficulty: 1,
+    category: 'grounding',
     gps_required: false,
   },
   {
@@ -88,6 +91,8 @@ const DEFAULT_FIVE_TASKS = [
     description: 'Elevate heart rate and boost bilateral stimulation with GPS-verified movement.',
     points: 25,
     status: 'assigned',
+    difficulty: 2,
+    category: 'cardio',
     gps_required: true,
     gps_target_distance_meters: 1000,
   },
@@ -98,6 +103,8 @@ const DEFAULT_FIVE_TASKS = [
     description: 'Challenge a combat anxiety thought pattern by writing down a grounded perspective.',
     points: 20,
     status: 'assigned',
+    difficulty: 2,
+    category: 'reframing',
     gps_required: false,
   },
   {
@@ -107,6 +114,8 @@ const DEFAULT_FIVE_TASKS = [
     description: 'Leave an encouraging word for your Morning Walkers recovery squad.',
     points: 15,
     status: 'assigned',
+    difficulty: 1,
+    category: 'social',
     gps_required: false,
   },
   {
@@ -116,6 +125,8 @@ const DEFAULT_FIVE_TASKS = [
     description: '4-4-4-4 diaphragmatic breathing session to calm sympathetic nervous tone before bed.',
     points: 15,
     status: 'assigned',
+    difficulty: 1,
+    category: 'breathing',
     gps_required: false,
   },
 ];
@@ -127,18 +138,10 @@ const DashboardScreen = ({ navigation }) => {
   const [dashboardData, setDashboardData] = useState(null);
   const [completingTaskId, setCompletingTaskId] = useState(null);
   const [counselorModalVisible, setCounselorModalVisible] = useState(false);
+  const [groundingModalVisible, setGroundingModalVisible] = useState(false);
+  const [groundingStep, setGroundingStep] = useState(5);
 
-  useEffect(() => {
-    loadDashboard();
-  }, [user]);
-
-  useFocusEffect(
-    React.useCallback(() => {
-      loadDashboard();
-    }, [user])
-  );
-
-  const loadDashboard = async () => {
+  const loadDashboard = useCallback(async () => {
     try {
       if (user?.id) {
         try {
@@ -166,7 +169,7 @@ const DashboardScreen = ({ navigation }) => {
             return;
           }
         } catch (apiErr) {
-          console.warn('Live dashboard fetch fallback:', apiErr.message);
+          console.warn('Live dashboard fallback:', apiErr.message);
         }
       }
 
@@ -178,7 +181,6 @@ const DashboardScreen = ({ navigation }) => {
       );
 
       setDashboardData({
-        greeting: getGreeting(),
         stats: {
           total_points: user?.total_points || 250,
           current_streak: user?.current_streak || 5,
@@ -186,14 +188,6 @@ const DashboardScreen = ({ navigation }) => {
           pending_tasks: checkedFallbackTasks.filter((t) => t.status !== 'completed').length,
         },
         today_tasks: checkedFallbackTasks,
-        groups: [
-          {
-            id: 'g1',
-            name: 'Morning Walkers',
-            member_count: 8,
-            total_points: 450,
-          },
-        ],
       });
     } catch (err) {
       console.error('Error loading dashboard:', err);
@@ -201,64 +195,21 @@ const DashboardScreen = ({ navigation }) => {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    loadDashboard();
+  }, [loadDashboard]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadDashboard();
+    }, [loadDashboard])
+  );
 
   const onRefresh = () => {
     setRefreshing(true);
     loadDashboard();
-  };
-
-  const getGreeting = () => {
-    const hours = new Date().getHours();
-    if (hours < 12) return 'Good morning';
-    if (hours < 18) return 'Good afternoon';
-    return 'Good evening';
-  };
-
-  const handleSelectCounselor = async (counselor) => {
-    try {
-      if (user?.id) {
-        await chatAPI.chooseCounselor(user.id, counselor.id, counselor.name).catch(() => {});
-      }
-    } catch (e) {
-      console.warn('Counselor select api fallback:', e);
-    }
-
-    const updated = {
-      ...user,
-      assignedCounselorId: counselor.id,
-      assignedCounselorName: counselor.name,
-      assignedCounselorTitle: counselor.title,
-      assignedCounselorSpecialty: counselor.specialty,
-    };
-    if (setUser) setUser(updated);
-    try {
-      await storage.set('user', JSON.stringify(updated));
-    } catch (e) {}
-
-    setCounselorModalVisible(false);
-    if (Platform.OS === 'web') {
-      window.alert(`Assigned to ${counselor.name}!\n\nYour clinical channel is now connected to ${counselor.institution}.`);
-    } else {
-      Alert.alert('Counselor Assigned! 🩺', `Your clinical channel is now connected to ${counselor.name}.`);
-    }
-  };
-
-  const handleSignOut = () => {
-    if (Platform.OS === 'web') {
-      if (typeof window !== 'undefined' && window.confirm) {
-        if (window.confirm('Are you sure you want to sign out of your account?')) {
-          logout();
-        }
-      } else {
-        logout();
-      }
-    } else {
-      Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Sign Out', style: 'destructive', onPress: () => logout() },
-      ]);
-    }
   };
 
   const handleToggleTask = async (task) => {
@@ -305,331 +256,408 @@ const DashboardScreen = ({ navigation }) => {
 
       const msg = `+${task.points} Valor Points awarded. Outstanding consistency!`;
       if (Platform.OS === 'web') {
-        window.alert(`Valor Milestone! 🎯\n\n${msg}`);
+        window.alert(`Drill Completed! 🎖️\n\n${msg}`);
       } else {
-        Alert.alert('Valor Milestone! 🎯', msg);
+        Alert.alert('Drill Completed! 🎖️', msg);
       }
     } finally {
       setCompletingTaskId(null);
     }
   };
 
-  if (loading && !dashboardData) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={theme.colors.rust[500]} />
-        <Text style={styles.loadingText}>Loading your daily journey...</Text>
-      </View>
-    );
-  }
+  const handleSelectCounselor = async (counselor) => {
+    try {
+      if (user?.id) {
+        await chatAPI.chooseCounselor(user.id, counselor.id, counselor.name).catch(() => {});
+      }
+    } catch (e) {
+      console.warn('Counselor select api fallback:', e);
+    }
+
+    const updated = {
+      ...user,
+      assignedCounselorId: counselor.id,
+      assignedCounselorName: counselor.name,
+      assignedCounselorTitle: counselor.title,
+      assignedCounselorSpecialty: counselor.specialty,
+    };
+    if (setUser) setUser(updated);
+    await storage.set('user', JSON.stringify(updated));
+
+    setCounselorModalVisible(false);
+    if (Platform.OS === 'web') {
+      window.alert(`Assigned to ${counselor.name}!\n\nYour clinical channel is now linked to ${counselor.institution}.`);
+    } else {
+      Alert.alert('Counselor Assigned! 🩺', `Your clinical channel is now linked to ${counselor.name}.`);
+    }
+  };
 
   const tasks = dashboardData?.today_tasks || DEFAULT_FIVE_TASKS;
   const completedCount = tasks.filter((t) => t.status === 'completed').length;
   const totalCount = tasks.length || 5;
   const progressPercent = Math.round((completedCount / totalCount) * 100);
-
   const assignedCounselorName = user?.assignedCounselorName || 'Dr. Ananya Nair, MD';
   const assignedCounselorTitle = user?.assignedCounselorTitle || 'Lead Trauma Specialist • Amrita';
+
+  const getTypeTheme = (type) => {
+    switch (type) {
+      case 'physical':
+        return { border: '#D96B27', bg: '#FFF7ED', icon: 'walk', label: 'Physical GPS', color: '#D96B27' };
+      case 'social':
+        return { border: '#059669', bg: '#F0FDF4', icon: 'people', label: 'Social Squad', color: '#059669' };
+      case 'mental':
+      default:
+        return { border: '#6366F1', bg: '#EEF2FF', icon: 'brain', label: 'Mental Grounding', color: '#6366F1' };
+    }
+  };
+
+  if (loading && !dashboardData) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#8C4A1E" />
+        <Text style={styles.loadingText}>Loading headquarters command center...</Text>
+      </View>
+    );
+  }
 
   return (
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.scrollContent}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.colors.rust[500]]} />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#8C4A1E']} />}
     >
-      {/* Hero Profile Card */}
-      <View style={styles.heroCard}>
-        <View style={styles.heroTopRow}>
-          <View style={styles.heroAvatar}>
-            <Text style={styles.heroAvatarText}>
-              {user?.name ? user.name.charAt(0) : 'V'}
+      {/* 1. COMMANDER STATUS BAR */}
+      <View style={styles.statusBarCard}>
+        <TouchableOpacity
+          style={styles.profileTap}
+          onPress={() => navigation.navigate('Profile')}
+          activeOpacity={0.8}
+        >
+          <View style={styles.commanderAvatar}>
+            <Text style={styles.commanderAvatarText}>
+              {user?.name ? user.name.slice(0, 2).toUpperCase() : 'VR'}
             </Text>
+            <View style={styles.avatarOnlineDot} />
           </View>
-          <View style={styles.heroTitles}>
-            <Text style={styles.heroGreeting}>
-              {getGreeting()}, {user?.name?.split(' ')[1] || 'Warrior'}
-            </Text>
-            <Text style={styles.heroRank}>
-              {user?.service_branch || 'Indian Army (Para SF)'} • {user?.rank || 'Captain'}
-            </Text>
+          <View>
+            <Text style={styles.commanderGreeting}>WELCOME BACK, {user?.rank ? user.rank.toUpperCase() : 'WARRIOR'}</Text>
+            <Text style={styles.commanderName}>{user?.name || 'Vikramaditya Rathore'}</Text>
+            <Text style={styles.commanderUnit}>{user?.service_branch || 'Indian Army (Para SF)'}</Text>
           </View>
+        </TouchableOpacity>
 
-          {/* Quick Sign Out Button in Header */}
-          <TouchableOpacity
-            style={styles.heroLogoutBtn}
-            onPress={handleSignOut}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="log-out-outline" size={16} color="#FFFFFF" />
-            <Text style={styles.heroLogoutText}>Sign Out</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Quick Stats Bar inside Hero */}
-        <View style={styles.heroStatsBar}>
-          <View style={styles.heroStatItem}>
-            <View style={styles.statIconBadge}>
-              <Ionicons name="trophy" size={16} color="#D97706" />
-            </View>
-            <View>
-              <Text style={styles.heroStatValue}>{dashboardData?.stats?.total_points || 250}</Text>
-              <Text style={styles.heroStatLabel}>Valor Points</Text>
-            </View>
-          </View>
-
-          <View style={styles.heroStatDivider} />
-
-          <View style={styles.heroStatItem}>
-            <View style={styles.statIconBadge}>
-              <Ionicons name="flame" size={16} color={theme.colors.rust[500]} />
-            </View>
-            <View>
-              <Text style={styles.heroStatValue}>{dashboardData?.stats?.current_streak || 5} d</Text>
-              <Text style={styles.heroStatLabel}>Day Streak</Text>
-            </View>
-          </View>
-
-          <View style={styles.heroStatDivider} />
-
-          <View style={styles.heroStatItem}>
-            <View style={styles.statIconBadge}>
-              <Ionicons name="checkmark-circle" size={16} color={theme.colors.status.stable} />
-            </View>
-            <View>
-              <Text style={styles.heroStatValue}>{completedCount}/{totalCount}</Text>
-              <Text style={styles.heroStatLabel}>5 Tasks Done</Text>
-            </View>
-          </View>
-        </View>
+        {/* SOS Crisis Beacon */}
+        <TouchableOpacity
+          style={styles.crisisBeaconBtn}
+          onPress={() => navigation.navigate('Crisis')}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="shield" size={16} color="#FFFFFF" />
+          <Text style={styles.crisisBeaconText}>SOS</Text>
+        </TouchableOpacity>
       </View>
 
-      {/* Today's Journey Progress Card */}
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
+      {/* 2. READINESS DIAL & 3-METRIC SUMMARY */}
+      <View style={styles.readinessCard}>
+        <View style={styles.readinessTopRow}>
           <View>
-            <Text style={styles.cardOverline}>TODAY'S 5-TASK RECOVERY PLAN</Text>
-            <Text style={styles.cardTitle}>Daily Discipline & Consistency</Text>
+            <Text style={styles.readinessOverline}>DAILY RECOVERY PROTOCOL</Text>
+            <Text style={styles.readinessTitle}>Readiness & Rituals</Text>
           </View>
-          <View style={styles.percentBadge}>
-            <Text style={styles.percentBadgeText}>{progressPercent}% Complete</Text>
+          <View style={styles.readinessPercentBadge}>
+            <Text style={styles.readinessPercentText}>{progressPercent}%</Text>
           </View>
         </View>
 
-        <View style={styles.progressBarBg}>
+        {/* Progress Track */}
+        <View style={styles.progressBarTrack}>
           <View style={[styles.progressBarFill, { width: `${progressPercent}%` }]} />
         </View>
 
-        <Text style={styles.progressSubtext}>
+        <Text style={styles.readinessSub}>
           {completedCount === totalCount
-            ? '🎉 Outstanding! All 5 daily wellness rituals completed.'
-            : `${totalCount - completedCount} tasks remaining to preserve your active streak.`}
+            ? '🎖️ Mission accomplished! All 5 recovery drills completed today.'
+            : `${totalCount - completedCount} drills remaining to preserve your 100% daily readiness score.`}
         </Text>
+
+        {/* 3 Metric Chips */}
+        <View style={styles.metricChipsRow}>
+          <View style={styles.metricChip}>
+            <View style={[styles.metricChipIcon, { backgroundColor: '#FEF3C7' }]}>
+              <Ionicons name="trophy" size={16} color="#D97706" />
+            </View>
+            <View>
+              <Text style={styles.metricChipVal}>{dashboardData?.stats?.total_points || user?.total_points || 250}</Text>
+              <Text style={styles.metricChipLbl}>Valor XP</Text>
+            </View>
+          </View>
+
+          <View style={styles.metricChip}>
+            <View style={[styles.metricChipIcon, { backgroundColor: '#FFEDD5' }]}>
+              <Ionicons name="flame" size={16} color="#EA580C" />
+            </View>
+            <View>
+              <Text style={styles.metricChipVal}>{dashboardData?.stats?.current_streak || user?.current_streak || 5} d</Text>
+              <Text style={styles.metricChipLbl}>Streak</Text>
+            </View>
+          </View>
+
+          <View style={styles.metricChip}>
+            <View style={[styles.metricChipIcon, { backgroundColor: '#D1FAE5' }]}>
+              <Ionicons name="checkmark-done-circle" size={16} color="#059669" />
+            </View>
+            <View>
+              <Text style={styles.metricChipVal}>{completedCount}/{totalCount}</Text>
+              <Text style={styles.metricChipLbl}>Done</Text>
+            </View>
+          </View>
+        </View>
       </View>
 
-      {/* Daily 5-Questionnaire Check-In Prompt */}
+      {/* 3. HARVARD TRAUMA CLINICAL PROTOCOL BANNER */}
       <TouchableOpacity
-        style={styles.checkInCard}
+        style={styles.harvardCard}
         onPress={() => navigation.navigate('Assessment')}
         activeOpacity={0.85}
       >
-        <View style={styles.checkInIconCircle}>
-          <Ionicons name="clipboard" size={22} color={theme.colors.rust[500]} />
+        <View style={styles.harvardIconWrap}>
+          <Ionicons name="pulse" size={24} color="#8C4A1E" />
         </View>
-        <View style={styles.checkInInfo}>
-          <Text style={styles.checkInOverline}>HARVARD TRAUMA CLINICAL PROTOCOL</Text>
-          <Text style={styles.checkInTitle}>Daily 5-Question Check-In</Text>
-          <Text style={styles.checkInSubtitle}>
-            Complete your 5 daily questions • Earn +20 Valor Points
+        <View style={{ flex: 1 }}>
+          <View style={styles.harvardTagRow}>
+            <Text style={styles.harvardOverline}>HARVARD TRAUMA PROTOCOL</Text>
+            <View style={styles.clinicalBadge}>
+              <Text style={styles.clinicalBadgeText}>Clinical Grade</Text>
+            </View>
+          </View>
+          <Text style={styles.harvardTitle}>Daily 5-Question Wellness Check-In</Text>
+          <Text style={styles.harvardDesc}>
+            Confidential trauma evaluation with encrypted counselor routing • +20 XP
           </Text>
         </View>
-        <View style={styles.takeTestBtn}>
-          <Text style={styles.takeTestBtnText}>Open</Text>
-          <Ionicons name="arrow-forward" size={14} color="#FFFFFF" />
+        <View style={styles.harvardArrowBtn}>
+          <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
         </View>
       </TouchableOpacity>
 
-      {/* Today's Tasks Section (Exactly 5 Tasks) */}
+      {/* 4. TODAY'S 5 TACTICAL MISSIONS */}
       <View style={styles.sectionHeader}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <Text style={styles.sectionTitle}>Today's 5 Daily Tasks</Text>
-          <View style={styles.fiveBadge}>
-            <Text style={styles.fiveBadgeText}>5/day</Text>
-          </View>
+          <Ionicons name="flash" size={18} color="#8C4A1E" />
+          <Text style={styles.sectionHeaderTitle}>Today's 5 Recovery Drills</Text>
         </View>
         <TouchableOpacity onPress={() => navigation.navigate('Tasks')}>
-          <Text style={styles.seeAllText}>View All Tasks</Text>
+          <Text style={styles.sectionHeaderLink}>Full Roster →</Text>
         </TouchableOpacity>
       </View>
 
       {tasks.map((task) => {
         const isDone = task.status === 'completed';
         const isBusy = completingTaskId === task.id;
+        const themeInfo = getTypeTheme(task.type);
 
         return (
-          <TouchableOpacity
+          <View
             key={task.id}
-            style={[styles.taskCard, isDone && styles.taskCardCompleted]}
-            onPress={() => {
-              if (task.gps_required && !isDone) {
-                navigation.navigate('GPSTracking', { taskId: task.id, task });
-              } else {
-                handleToggleTask(task);
-              }
-            }}
-            activeOpacity={0.7}
+            style={[
+              styles.missionCard,
+              { borderLeftColor: isDone ? '#059669' : themeInfo.border },
+              isDone && styles.missionCardDone,
+            ]}
           >
-            <TouchableOpacity
-              style={[styles.checkbox, isDone && styles.checkboxDone]}
-              onPress={() => handleToggleTask(task)}
-            >
-              {isBusy ? (
-                <ActivityIndicator size="small" color={theme.colors.rust[500]} />
-              ) : isDone ? (
-                <Ionicons name="checkmark" size={16} color="#fff" />
-              ) : null}
-            </TouchableOpacity>
-
-            <View style={styles.taskBody}>
-              <View style={styles.taskTagRow}>
-                <View style={styles.categoryTag}>
-                  <Text style={styles.categoryTagText}>{task.type || 'Mental'}</Text>
-                </View>
-                {task.gps_required && (
-                  <View style={styles.gpsTag}>
-                    <Ionicons name="location" size={10} color="#B45309" />
-                    <Text style={styles.gpsTagText}>GPS Tracking</Text>
-                  </View>
-                )}
-                <Text style={styles.pointsTag}>+{task.points} pts</Text>
+            <View style={styles.missionHeaderRow}>
+              <View style={[styles.missionTypePill, { backgroundColor: themeInfo.bg }]}>
+                <Ionicons name={themeInfo.icon} size={12} color={themeInfo.color} style={{ marginRight: 4 }} />
+                <Text style={[styles.missionTypePillText, { color: themeInfo.color }]}>
+                  {themeInfo.label}
+                </Text>
               </View>
 
-              <Text style={[styles.taskTitle, isDone && styles.taskTitleDone]}>
-                {task.title}
-              </Text>
-              <Text style={styles.taskDescription} numberOfLines={2}>
-                {task.description}
-              </Text>
+              <View style={styles.missionPointsPill}>
+                <Ionicons name="trophy" size={11} color="#D97706" style={{ marginRight: 3 }} />
+                <Text style={styles.missionPointsText}>+{task.points} XP</Text>
+              </View>
+            </View>
 
-              {task.gps_required && !isDone && (
+            <Text style={[styles.missionTitle, isDone && styles.missionTitleDone]}>{task.title}</Text>
+            <Text style={styles.missionDesc} numberOfLines={2}>{task.description}</Text>
+
+            {/* Action Bar */}
+            <View style={styles.missionFooterRow}>
+              {task.gps_required ? (
+                <View style={styles.gpsInfoChip}>
+                  <Ionicons name="navigate" size={12} color="#D96B27" style={{ marginRight: 4 }} />
+                  <Text style={styles.gpsInfoChipText}>
+                    {task.gps_target_distance_meters || 1000}m GPS Walk Target
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.gpsInfoChip}>
+                  <Ionicons name="sparkles" size={12} color="#6366F1" style={{ marginRight: 4 }} />
+                  <Text style={[styles.gpsInfoChipText, { color: '#4F46E5' }]}>Verified Somatic Ritual</Text>
+                </View>
+              )}
+
+              {isDone ? (
+                <View style={styles.doneBadge}>
+                  <Ionicons name="checkmark-circle" size={16} color="#059669" style={{ marginRight: 4 }} />
+                  <Text style={styles.doneBadgeText}>Completed</Text>
+                </View>
+              ) : task.gps_required ? (
                 <TouchableOpacity
-                  style={styles.gpsStartBtn}
+                  style={styles.deployGpsBtn}
                   onPress={() => navigation.navigate('GPSTracking', { taskId: task.id, task })}
+                  activeOpacity={0.85}
                 >
-                  <Ionicons name="navigate" size={12} color="#FFFFFF" style={{ marginRight: 4 }} />
-                  <Text style={styles.gpsStartBtnText}>Start GPS Walk (1.0 km)</Text>
+                  <Ionicons name="navigate" size={14} color="#FFFFFF" style={{ marginRight: 4 }} />
+                  <Text style={styles.deployGpsBtnText}>Deploy Walk</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={styles.completeDrillBtn}
+                  onPress={() => handleToggleTask(task)}
+                  disabled={isBusy}
+                  activeOpacity={0.85}
+                >
+                  {isBusy ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <>
+                      <Ionicons name="checkmark" size={14} color="#FFFFFF" style={{ marginRight: 4 }} />
+                      <Text style={styles.completeDrillBtnText}>Complete</Text>
+                    </>
+                  )}
                 </TouchableOpacity>
               )}
             </View>
-          </TouchableOpacity>
+          </View>
         );
       })}
 
-      {/* Clinical Counselor Direct Channel with Change Counselor Button */}
-      <View style={styles.counselorCard}>
-        <View style={styles.counselorHeader}>
-          <View style={styles.counselorAvatar}>
-            <Text style={styles.counselorAvatarText}>
-              {assignedCounselorName.split(' ').map((n) => n[0]).slice(0, 2).join('')}
-            </Text>
+      {/* 5. ENCRYPTED CLINICAL CHANNEL CARD */}
+      <View style={styles.counselorBannerCard}>
+        <View style={styles.counselorHeaderRow}>
+          <View style={styles.counselorAvatarCircle}>
+            <Ionicons name="medkit" size={20} color="#0D9488" />
           </View>
-          <View style={styles.counselorTextGroup}>
-            <Text style={styles.counselorCardName}>{assignedCounselorName}</Text>
-            <Text style={styles.counselorCardRole}>{assignedCounselorTitle}</Text>
+          <View style={{ flex: 1, marginLeft: 12 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={styles.counselorNameText}>{assignedCounselorName}</Text>
+              <View style={styles.encryptedPill}>
+                <Ionicons name="lock-closed" size={10} color="#059669" />
+                <Text style={styles.encryptedPillText}>Encrypted</Text>
+              </View>
+            </View>
+            <Text style={styles.counselorSpecialtyText}>{assignedCounselorTitle}</Text>
           </View>
         </View>
 
-        <View style={styles.counselorBtnRow}>
+        <View style={styles.counselorActionRow}>
           <TouchableOpacity
-            style={styles.dmButton}
-            onPress={() => navigation.navigate('Chat', { counselorName: assignedCounselorName })}
-          >
-            <Ionicons name="chatbubble-ellipses" size={16} color="#fff" style={{ marginRight: 6 }} />
-            <Text style={styles.dmButtonText}>Message Counselor</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.changeCounselorBtn}
+            style={styles.changeDocBtn}
             onPress={() => setCounselorModalVisible(true)}
           >
-            <Ionicons name="swap-horizontal" size={16} color={theme.colors.rust[600]} style={{ marginRight: 4 }} />
-            <Text style={styles.changeCounselorBtnText}>Change Counselor</Text>
+            <Text style={styles.changeDocBtnText}>Change Specialist</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.openCommsBtn}
+            onPress={() => navigation.navigate('Chat', { counselorName: assignedCounselorName })}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="chatbubbles" size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
+            <Text style={styles.openCommsBtnText}>Open Secure Comms</Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Active Squads Quick Access */}
-      <View style={styles.squadCard}>
-        <View style={styles.squadInfo}>
-          <Ionicons name="people" size={24} color={theme.colors.rust[500]} style={{ marginRight: 10 }} />
-          <View>
-            <Text style={styles.squadTitle}>Morning Walkers Squad</Text>
-            <Text style={styles.squadSub}>8 comrades • 450 squad points</Text>
-          </View>
-        </View>
-        <TouchableOpacity
-          style={styles.squadLink}
-          onPress={() => navigation.navigate('Groups')}
-        >
-          <Text style={styles.squadLinkText}>Squad Hub</Text>
-          <Ionicons name="arrow-forward" size={14} color={theme.colors.rust[600]} />
-        </TouchableOpacity>
-      </View>
-
-      {/* COUNSELOR SELECTION MODAL */}
-      <Modal
-        visible={counselorModalVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setCounselorModalVisible(false)}
+      {/* 6. RAPID SENSORY GROUNDING LAUNCHER */}
+      <TouchableOpacity
+        style={styles.rapidGroundingBtn}
+        onPress={() => setGroundingModalVisible(true)}
+        activeOpacity={0.85}
       >
+        <Ionicons name="shield-checkmark" size={18} color="#8C4A1E" style={{ marginRight: 8 }} />
+        <Text style={styles.rapidGroundingText}>Feeling Tension? Launch 5-4-3-2-1 Grounding</Text>
+      </TouchableOpacity>
+
+      {/* MODAL 1: SENSORY GROUNDING WALKTHROUGH */}
+      <Modal visible={groundingModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <View>
-                <Text style={styles.modalOverline}>CLINICAL DIRECTORY</Text>
-                <Text style={styles.modalTitle}>Choose Your Counselor</Text>
-              </View>
-              <TouchableOpacity
-                onPress={() => setCounselorModalVisible(false)}
-                style={styles.modalCloseBtn}
-              >
-                <Ionicons name="close" size={22} color={theme.colors.espresso[700]} />
+          <View style={styles.groundingSheet}>
+            <View style={styles.modalHeaderRow}>
+              <Text style={styles.groundingModalTitle}>5-4-3-2-1 Somatic Grounding</Text>
+              <TouchableOpacity onPress={() => setGroundingModalVisible(false)}>
+                <Ionicons name="close-circle" size={24} color="#6B7280" />
               </TouchableOpacity>
             </View>
+            <Text style={styles.groundingModalDesc}>
+              Combat anxiety, triggers, or emotional flashbacks by bringing your sensory awareness to the present room.
+            </Text>
 
-            <ScrollView style={{ maxHeight: 420 }}>
+            <View style={styles.groundingStepBox}>
+              <Text style={styles.groundingStepBig}>👀 5 Things You See</Text>
+              <Text style={styles.groundingStepSub}>Look around you right now. Notice 5 distinct colors, shapes, or objects.</Text>
+            </View>
+
+            <View style={styles.groundingStepBox}>
+              <Text style={styles.groundingStepBig}>✋ 4 Things You Can Touch</Text>
+              <Text style={styles.groundingStepSub}>Feel your feet on the ground, your uniform/shirt, a cool surface, or ring.</Text>
+            </View>
+
+            <View style={styles.groundingStepBox}>
+              <Text style={styles.groundingStepBig}>👂 3 Things You Hear</Text>
+              <Text style={styles.groundingStepSub}>Notice 3 sounds: a fan, distant traffic, or your own slow breath.</Text>
+            </View>
+
+            <TouchableOpacity
+              style={styles.closeGroundingBtn}
+              onPress={() => setGroundingModalVisible(false)}
+            >
+              <Text style={styles.closeGroundingBtnText}>I am Grounded & Present</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* MODAL 2: CLINICAL SPECIALIST SELECTION */}
+      <Modal visible={counselorModalVisible} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.counselorSheet}>
+            <View style={styles.modalHeaderRow}>
+              <Text style={styles.groundingModalTitle}>Assign Clinical Lead</Text>
+              <TouchableOpacity onPress={() => setCounselorModalVisible(false)}>
+                <Ionicons name="close" size={24} color="#111827" />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.groundingModalDesc}>
+              Select your accredited military trauma psychiatrist or clinical recovery officer.
+            </Text>
+
+            <ScrollView style={{ maxHeight: 360, marginTop: 10 }}>
               {COUNSELORS_LIST.map((c) => {
-                const isSelected = assignedCounselorName.includes(c.name.split(' ')[1]);
+                const isSelected = assignedCounselorName === c.name;
                 return (
                   <TouchableOpacity
                     key={c.id}
-                    style={[styles.counselorOptionCard, isSelected && styles.counselorOptionActive]}
+                    style={[styles.counselorPickCard, isSelected && styles.counselorPickCardSelected]}
                     onPress={() => handleSelectCounselor(c)}
-                    activeOpacity={0.8}
                   >
-                    <View style={styles.counselorOptionAvatar}>
-                      <Text style={styles.counselorOptionAvatarText}>{c.avatar}</Text>
+                    <View style={styles.counselorPickAvatar}>
+                      <Text style={styles.counselorPickAvatarText}>{c.avatar}</Text>
                     </View>
-                    <View style={{ flex: 1 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <Text style={styles.counselorOptionName}>{c.name}</Text>
-                        <Text style={styles.ratingText}>⭐ {c.rating}</Text>
-                      </View>
-                      <Text style={styles.counselorOptionTitle}>{c.title}</Text>
-                      <Text style={styles.counselorOptionInst}>{c.institution}</Text>
-                      <Text style={styles.counselorOptionSpec}>Focus: {c.specialty}</Text>
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                      <Text style={styles.counselorPickName}>{c.name}</Text>
+                      <Text style={styles.counselorPickTitle}>{c.title}</Text>
+                      <Text style={styles.counselorPickInst}>{c.institution}</Text>
                     </View>
+                    {isSelected && (
+                      <Ionicons name="checkmark-circle" size={22} color="#0D9488" />
+                    )}
                   </TouchableOpacity>
                 );
               })}
             </ScrollView>
-
-            <TouchableOpacity
-              style={styles.modalCancelBtn}
-              onPress={() => setCounselorModalVisible(false)}
-            >
-              <Text style={styles.modalCancelText}>Close</Text>
-            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -640,571 +668,615 @@ const DashboardScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.cream[200],
+    backgroundColor: '#F8F9FA',
   },
   scrollContent: {
     padding: 16,
-    paddingBottom: 30,
+    paddingBottom: 40,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: theme.colors.cream[200],
+    backgroundColor: '#F8F9FA',
   },
   loadingText: {
+    fontSize: 13,
+    color: '#786F68',
     marginTop: 12,
-    color: theme.colors.espresso[500],
-    fontSize: 14,
     fontWeight: '600',
   },
-  heroCard: {
-    backgroundColor: theme.colors.espresso[900],
-    borderRadius: 24,
-    padding: 20,
-    marginBottom: 16,
-    ...theme.shadows.warm,
-  },
-  heroTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  heroAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: theme.colors.rust[500],
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-    ...theme.shadows.sm,
-  },
-  heroAvatarText: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: '900',
-  },
-  heroTitles: {
-    flex: 1,
-  },
-  heroGreeting: {
-    color: '#FFFFFF',
-    fontSize: 17,
-    fontWeight: '800',
-  },
-  heroRank: {
-    color: theme.colors.rust[300],
-    fontSize: 12,
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  heroLogoutBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
-    gap: 4,
-  },
-  heroLogoutText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  heroStatsBar: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-  },
-  heroStatItem: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  statIconBadge: {
-    width: 30,
-    height: 30,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  heroStatValue: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  heroStatLabel: {
-    color: theme.colors.espresso[300],
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  heroStatDivider: {
-    width: 1,
-    height: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    marginHorizontal: 8,
-  },
-  card: {
+
+  /* 1. Status Bar */
+  statusBarCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 20,
     padding: 16,
     borderWidth: 1,
-    borderColor: theme.colors.cream[400],
-    marginBottom: 14,
-    ...theme.shadows.sm,
+    borderColor: '#E8DCCE',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    shadowColor: '#282524',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
   },
-  cardHeader: {
+  profileTap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  commanderAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#F7DFCC',
+    borderWidth: 2,
+    borderColor: '#8C4A1E',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+    position: 'relative',
+  },
+  commanderAvatarText: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#8C4A1E',
+  },
+  avatarOnlineDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#059669',
+    position: 'absolute',
+    bottom: -1,
+    right: -1,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  commanderGreeting: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#8C4A1E',
+    letterSpacing: 1,
+  },
+  commanderName: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#1C1917',
+    marginTop: 1,
+  },
+  commanderUnit: {
+    fontSize: 11,
+    color: '#786F68',
+  },
+  crisisBeaconBtn: {
+    backgroundColor: '#DC2626',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    gap: 4,
+    shadowColor: '#DC2626',
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  crisisBeaconText: {
+    color: '#FFFFFF',
+    fontWeight: '900',
+    fontSize: 12,
+  },
+
+  /* 2. Readiness Card */
+  readinessCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 22,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: '#E8DCCE',
+    marginBottom: 14,
+    shadowColor: '#282524',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  readinessTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  readinessOverline: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#8C4A1E',
+    letterSpacing: 1.1,
+  },
+  readinessTitle: {
+    fontSize: 19,
+    fontWeight: '900',
+    color: '#1C1917',
+    marginTop: 2,
+  },
+  readinessPercentBadge: {
+    backgroundColor: '#F7DFCC',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  readinessPercentText: {
+    color: '#8C4A1E',
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  progressBarTrack: {
+    height: 10,
+    backgroundColor: '#EFE8DE',
+    borderRadius: 5,
+    overflow: 'hidden',
+    marginVertical: 10,
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: '#D96B27',
+    borderRadius: 5,
+  },
+  readinessSub: {
+    fontSize: 12,
+    color: '#786F68',
+    lineHeight: 16,
+    marginBottom: 14,
+  },
+  metricChipsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  metricChip: {
+    flex: 1,
+    backgroundColor: '#FDF6EE',
+    borderRadius: 14,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#E8DCCE',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  metricChipIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  metricChipVal: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#1C1917',
+  },
+  metricChipLbl: {
+    fontSize: 10,
+    color: '#786F68',
+    fontWeight: '700',
+  },
+
+  /* 3. Harvard Trauma Banner */
+  harvardCard: {
+    backgroundColor: '#FAF3EC',
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1.5,
+    borderColor: '#D96B27',
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    shadowColor: '#D96B27',
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  harvardIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  harvardTagRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  harvardOverline: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#8C4A1E',
+    letterSpacing: 1,
+  },
+  clinicalBadge: {
+    backgroundColor: '#E0F2FE',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 6,
+  },
+  clinicalBadgeText: {
+    fontSize: 9,
+    color: '#0369A1',
+    fontWeight: '700',
+  },
+  harvardTitle: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#1C1917',
+    marginTop: 2,
+  },
+  harvardDesc: {
+    fontSize: 11,
+    color: '#786F68',
+    marginTop: 2,
+    lineHeight: 15,
+  },
+  harvardArrowBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#8C4A1E',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 10,
+  },
+
+  /* 4. Missions List */
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+    paddingHorizontal: 2,
+  },
+  sectionHeaderTitle: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#1C1917',
+  },
+  sectionHeaderLink: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#8C4A1E',
+  },
+  missionCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E8DCCE',
+    borderLeftWidth: 5,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  missionCardDone: {
+    backgroundColor: '#F9FAFB',
+    opacity: 0.85,
+  },
+  missionHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
   },
-  cardOverline: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: theme.colors.espresso[400],
-    letterSpacing: 1.2,
-  },
-  cardTitle: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: theme.colors.espresso[900],
-    marginTop: 2,
-  },
-  percentBadge: {
-    backgroundColor: theme.colors.peach[200],
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 10,
-  },
-  percentBadgeText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: theme.colors.rust[700],
-  },
-  progressBarBg: {
-    height: 8,
-    backgroundColor: theme.colors.cream[300],
-    borderRadius: 4,
-    overflow: 'hidden',
-    marginVertical: 6,
-  },
-  progressBarFill: {
-    height: '100%',
-    backgroundColor: theme.colors.rust[500],
-    borderRadius: 4,
-  },
-  progressSubtext: {
-    fontSize: 12,
-    color: theme.colors.espresso[500],
-    marginTop: 4,
-    fontWeight: '500',
-  },
-  checkInCard: {
+  missionTypePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.peach[100],
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: theme.colors.peach[300],
-    padding: 14,
-    marginBottom: 16,
-    ...theme.shadows.sm,
-  },
-  checkInIconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  checkInInfo: {
-    flex: 1,
-  },
-  checkInOverline: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: theme.colors.rust[600],
-    letterSpacing: 1,
-  },
-  checkInTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: theme.colors.espresso[900],
-    marginTop: 1,
-  },
-  checkInSubtitle: {
-    fontSize: 11,
-    color: theme.colors.espresso[500],
-    marginTop: 2,
-  },
-  takeTestBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.colors.rust[500],
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
-    gap: 4,
-  },
-  takeTestBtnText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-    marginTop: 4,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: theme.colors.espresso[900],
-  },
-  fiveBadge: {
-    backgroundColor: theme.colors.rust[100],
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  fiveBadgeText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: theme.colors.rust[600],
-  },
-  seeAllText: {
-    fontSize: 12,
-    color: theme.colors.rust[600],
-    fontWeight: '700',
-  },
-  taskCard: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: theme.colors.cream[400],
-    padding: 14,
-    marginBottom: 10,
-    ...theme.shadows.sm,
-  },
-  taskCardCompleted: {
-    backgroundColor: theme.colors.cream[100],
-    opacity: 0.85,
-  },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: theme.colors.rust[500],
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-    marginTop: 2,
-  },
-  checkboxDone: {
-    backgroundColor: theme.colors.status.stable,
-    borderColor: theme.colors.status.stable,
-  },
-  taskBody: {
-    flex: 1,
-  },
-  taskTagRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-    gap: 6,
-  },
-  categoryTag: {
-    backgroundColor: theme.colors.peach[200],
     paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingVertical: 3,
     borderRadius: 8,
   },
-  categoryTagText: {
+  missionTypePillText: {
     fontSize: 10,
-    fontWeight: '700',
-    color: theme.colors.rust[700],
+    fontWeight: '800',
     textTransform: 'uppercase',
   },
-  gpsTag: {
+  missionPointsPill: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FEF3C7',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     borderRadius: 8,
-    gap: 3,
   },
-  gpsTagText: {
-    fontSize: 10,
+  missionPointsText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#92400E',
+  },
+  missionTitle: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#1C1917',
+    marginBottom: 4,
+  },
+  missionTitleDone: {
+    textDecorationLine: 'line-through',
+    color: '#786F68',
+  },
+  missionDesc: {
+    fontSize: 12,
+    color: '#786F68',
+    lineHeight: 16,
+    marginBottom: 12,
+  },
+  missionFooterRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+    paddingTop: 10,
+  },
+  gpsInfoChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  gpsInfoChipText: {
+    fontSize: 11,
     fontWeight: '700',
     color: '#B45309',
   },
-  pointsTag: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: theme.colors.rust[600],
-    marginLeft: 'auto',
-  },
-  taskTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: theme.colors.espresso[900],
-    marginBottom: 2,
-  },
-  taskTitleDone: {
-    textDecorationLine: 'line-through',
-    color: theme.colors.espresso[400],
-  },
-  taskDescription: {
-    fontSize: 12,
-    color: theme.colors.espresso[500],
-    lineHeight: 16,
-  },
-  gpsStartBtn: {
+  deployGpsBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#0D9488',
-    alignSelf: 'flex-start',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-    marginTop: 8,
+    backgroundColor: '#D96B27',
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 10,
   },
-  gpsStartBtnText: {
+  deployGpsBtnText: {
     color: '#FFFFFF',
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '800',
   },
-  counselorCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: theme.colors.cream[400],
-    padding: 16,
-    marginTop: 8,
-    marginBottom: 10,
-    ...theme.shadows.sm,
-  },
-  counselorHeader: {
+  completeDrillBtn: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#8C4A1E',
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 10,
+  },
+  completeDrillBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  doneBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  doneBadgeText: {
+    color: '#059669',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+
+  /* 5. Clinical Counselor Banner */
+  counselorBannerCard: {
+    backgroundColor: '#F0FDFA',
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#99F6E4',
+    marginTop: 6,
     marginBottom: 12,
   },
-  counselorAvatar: {
+  counselorHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  counselorAvatarCircle: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: theme.colors.rust[500],
+    backgroundColor: '#CCFBF1',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
   },
-  counselorAvatarText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  counselorTextGroup: {
-    flex: 1,
-  },
-  counselorCardName: {
+  counselorNameText: {
     fontSize: 14,
-    fontWeight: '800',
-    color: theme.colors.espresso[900],
+    fontWeight: '900',
+    color: '#0F766E',
   },
-  counselorCardRole: {
+  encryptedPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#D1FAE5',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 6,
+    gap: 3,
+  },
+  encryptedPillText: {
+    fontSize: 9,
+    color: '#065F46',
+    fontWeight: '700',
+  },
+  counselorSpecialtyText: {
     fontSize: 11,
-    color: theme.colors.espresso[500],
-    marginTop: 1,
+    color: '#115E59',
+    marginTop: 2,
   },
-  counselorBtnRow: {
+  counselorActionRow: {
     flexDirection: 'row',
     gap: 10,
+    marginTop: 12,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#CCFBF1',
   },
-  dmButton: {
-    flex: 1.2,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme.colors.rust[500],
-    paddingVertical: 10,
-    borderRadius: 12,
-  },
-  dmButtonText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  changeCounselorBtn: {
+  changeDocBtn: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme.colors.cream[100],
-    borderWidth: 1,
-    borderColor: theme.colors.cream[400],
-    paddingVertical: 10,
-    borderRadius: 12,
-  },
-  changeCounselorBtnText: {
-    color: theme.colors.rust[600],
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  squadCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
     borderWidth: 1,
-    borderColor: theme.colors.cream[400],
-    padding: 14,
-    marginBottom: 20,
-    ...theme.shadows.sm,
-  },
-  squadInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  squadTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: theme.colors.espresso[900],
-  },
-  squadSub: {
-    fontSize: 11,
-    color: theme.colors.espresso[400],
-    marginTop: 1,
-  },
-  squadLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.colors.peach[200],
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    borderColor: '#99F6E4',
+    paddingVertical: 8,
     borderRadius: 10,
-    gap: 4,
+    alignItems: 'center',
   },
-  squadLinkText: {
-    fontSize: 11,
+  changeDocBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0F766E',
+  },
+  openCommsBtn: {
+    flex: 1.5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#0D9488',
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  openCommsBtnText: {
+    fontSize: 12,
     fontWeight: '800',
-    color: theme.colors.rust[700],
+    color: '#FFFFFF',
   },
+
+  /* 6. Rapid Grounding Launcher */
+  rapidGroundingBtn: {
+    backgroundColor: '#FDF6EE',
+    borderWidth: 1,
+    borderColor: '#E8DCCE',
+    borderRadius: 16,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  rapidGroundingText: {
+    color: '#8C4A1E',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+
+  /* Modals */
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
   },
-  modalContent: {
+  groundingSheet: {
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    padding: 20,
-    paddingBottom: 36,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 22,
   },
-  modalHeader: {
+  modalHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 6,
   },
-  modalOverline: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: theme.colors.espresso[400],
-    letterSpacing: 1.2,
-  },
-  modalTitle: {
+  groundingModalTitle: {
     fontSize: 18,
-    fontWeight: '800',
-    color: theme.colors.espresso[900],
-    marginTop: 2,
+    fontWeight: '900',
+    color: '#1C1917',
   },
-  modalCloseBtn: {
-    padding: 4,
+  groundingModalDesc: {
+    fontSize: 12,
+    color: '#786F68',
+    lineHeight: 16,
+    marginBottom: 14,
   },
-  counselorOptionCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.colors.cream[100],
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: theme.colors.cream[400],
+  groundingStepBox: {
+    backgroundColor: '#FDF6EE',
+    borderRadius: 14,
     padding: 12,
+    borderWidth: 1,
+    borderColor: '#E8DCCE',
     marginBottom: 10,
   },
-  counselorOptionActive: {
-    backgroundColor: theme.colors.peach[100],
-    borderColor: theme.colors.rust[500],
-  },
-  counselorOptionAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: theme.colors.rust[500],
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  counselorOptionAvatarText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  counselorOptionName: {
+  groundingStepBig: {
     fontSize: 14,
     fontWeight: '800',
-    color: theme.colors.espresso[900],
+    color: '#8C4A1E',
   },
-  ratingText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#D97706',
-  },
-  counselorOptionTitle: {
+  groundingStepSub: {
     fontSize: 11,
-    color: theme.colors.rust[600],
-    fontWeight: '700',
-    marginTop: 1,
-  },
-  counselorOptionInst: {
-    fontSize: 11,
-    color: theme.colors.espresso[600],
-    marginTop: 1,
-  },
-  counselorOptionSpec: {
-    fontSize: 10,
-    color: theme.colors.espresso[400],
+    color: '#786F68',
     marginTop: 2,
   },
-  modalCancelBtn: {
-    backgroundColor: theme.colors.espresso[900],
-    borderRadius: 14,
+  closeGroundingBtn: {
+    backgroundColor: '#8C4A1E',
     paddingVertical: 12,
+    borderRadius: 12,
     alignItems: 'center',
-    marginTop: 10,
+    marginTop: 8,
   },
-  modalCancelText: {
+  closeGroundingBtnText: {
     color: '#FFFFFF',
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '800',
+  },
+
+  /* Counselor Selection Sheet */
+  counselorSheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 20,
+    maxHeight: '80%',
+  },
+  counselorPickCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginBottom: 8,
+  },
+  counselorPickCardSelected: {
+    borderColor: '#0D9488',
+    backgroundColor: '#F0FDFA',
+  },
+  counselorPickAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#0D9488',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  counselorPickAvatarText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 13,
+  },
+  counselorPickName: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#1C1917',
+  },
+  counselorPickTitle: {
+    fontSize: 11,
+    color: '#4B5563',
+  },
+  counselorPickInst: {
+    fontSize: 10,
+    color: '#786F68',
+    marginTop: 1,
   },
 });
 
