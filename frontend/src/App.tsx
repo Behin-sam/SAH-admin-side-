@@ -30,6 +30,7 @@ import { AIAttentionCenterView } from './components/counselor/AIAttentionCenterV
 import { TaskManagementView } from './components/counselor/TaskManagementView';
 import { CommunicationHubView } from './components/counselor/CommunicationHubView';
 import { TaskEngagementView } from './components/counselor/TaskEngagementView';
+import { CaseloadAccessGuard } from './components/counselor/CaseloadAccessGuard';
 
 const MainContent: React.FC = () => {
   const { isAuthenticated, currentUser, currentRole, activeScreen } = useApp();
@@ -43,9 +44,9 @@ const MainContent: React.FC = () => {
     );
   }
 
-  // 2. Strict Role-Based View Guard
+  // 2. Render Role-Based Application
   const renderScreen = () => {
-    if (currentUser.role === 'veteran' || currentRole === 'veteran') {
+    if (currentRole === 'veteran') {
       switch (activeScreen) {
         case 'splash': return <SplashWelcome />;
         case 'assessment': return <InitialAssessment />;
@@ -67,14 +68,14 @@ const MainContent: React.FC = () => {
     switch (activeScreen) {
       case 'dashboard-overview': return <DashboardOverview />;
       case 'veteran-list': return <VeteranListView />;
-      case 'veteran-detail': return <VeteranDetailView />;
-      case 'counselor-physical': return <PhysicalWellbeingView />;
-      case 'counselor-mental': return <MentalWellbeingView />;
-      case 'counselor-engagement': return <TaskEngagementView />;
+      case 'veteran-detail': return <CaseloadAccessGuard><VeteranDetailView /></CaseloadAccessGuard>;
+      case 'counselor-physical': return <CaseloadAccessGuard><PhysicalWellbeingView /></CaseloadAccessGuard>;
+      case 'counselor-mental': return <CaseloadAccessGuard><MentalWellbeingView /></CaseloadAccessGuard>;
+      case 'counselor-engagement': return <CaseloadAccessGuard><TaskEngagementView /></CaseloadAccessGuard>;
       case 'ai-attention': return <AIAttentionCenterView />;
-      case 'checkin-history': return <VeteranDetailView />;
-      case 'task-management': return <TaskManagementView />;
-      case 'counselor-comm': return <CommunicationHubView />;
+      case 'checkin-history': return <CaseloadAccessGuard><VeteranDetailView /></CaseloadAccessGuard>;
+      case 'task-management': return <CaseloadAccessGuard><TaskManagementView /></CaseloadAccessGuard>;
+      case 'counselor-comm': return <CaseloadAccessGuard><CommunicationHubView /></CaseloadAccessGuard>;
       case 'counselor-settings': return <ProfileSettingsView />;
       default: return <DashboardOverview />;
     }

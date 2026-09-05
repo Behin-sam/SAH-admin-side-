@@ -177,8 +177,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               avatarUrl: v.avatarUrl,
               email: v.email,
               isEmailVerified: true,
-              assignedCounselorId: 'counselor-01',
-              assignedCounselorName: 'Dr. Ananya Nair',
+              assignedCounselorId: v.assigned_counselor_id || undefined,
+              assignedCounselorName: v.assigned_counselor_name || undefined,
               serviceBranch: v.service_branch,
             },
             profile: {
@@ -197,6 +197,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               level: Math.floor((v.total_points || 250) / 300) + 1,
               badges: DEMO_VETERANS[idx % DEMO_VETERANS.length]?.profile?.badges || [],
               currentRiskLevel: 'NORMAL' as const,
+              credibilityScore: v.credibility_score ?? 85,
+              stabilityScore: v.stability_score ?? 85,
             },
           }));
         } else {
@@ -647,24 +649,71 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  // Active Veteran references
-  const currentVetObj = allVeterans.find(v => v.user.id === activeVeteranId) || {
-    user: (currentRole === 'veteran' && currentUser) ? currentUser : (allVeterans[0]?.user || DEMO_VETERANS[0].user),
+  // Strict Caseload Filtering: Only veterans assigned to this counselor
+  const assignedVeterans = useMemo(() => {
+    if (!currentUser || currentUser.role !== 'counselor') return [];
+    const cId = currentUser.id;
+    const cName = currentUser.name?.toLowerCase().trim();
+
+    return allVeterans.filter(v => {
+      const vCounselorId = v.user.assignedCounselorId;
+      const vCounselorName = v.user.assignedCounselorName?.toLowerCase().trim();
+
+      const idMatch = vCounselorId && (vCounselorId === cId || cId.includes(vCounselorId) || vCounselorId.includes(cId));
+      const nameMatch = cName && vCounselorName && (vCounselorName.includes(cName) || cName.includes(vCounselorName));
+      return idMatch || nameMatch;
+    });
+  }, [allVeterans, currentUser]);
+
+  // Auto-align activeVeteranId for counselor:
+  // Ensure that a counselor's active context can NEVER point to an unassigned client.
+  useEffect(() => {
+    if (currentRole === 'counselor') {
+      if (assignedVeterans.length > 0) {
+        if (!assignedVeterans.some(v => v.user.id === activeVeteranId)) {
+          setActiveVeteranId(assignedVeterans[0].user.id);
+        }
+      } else {
+        if (activeVeteranId !== '') {
+          setActiveVeteranId('');
+        }
+      }
+    }
+  }, [currentRole, assignedVeterans, activeVeteranId]);
+
+  // Active Veteran references (Isolates counselors strictly to their assigned client)
+  const currentVetObj = (currentRole === 'counselor'
+    ? assignedVeterans.find(v => v.user.id === activeVeteranId)
+    : allVeterans.find(v => v.user.id === activeVeteranId)
+  ) || {
+    user: (currentRole === 'veteran' && currentUser)
+      ? currentUser
+      : (assignedVeterans[0]?.user || {
+          id: '',
+          name: 'No Assigned Veteran',
+          rank: 'N/A',
+          unit: 'N/A',
+          role: 'veteran' as UserRole,
+          avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=200',
+          email: '',
+          isEmailVerified: false,
+          serviceBranch: 'N/A'
+        }),
     profile: {
-      veteranId: activeVeteranId,
-      serviceBranch: currentUser?.serviceBranch || 'Indian Army',
-      yearsOfService: 10,
+      veteranId: activeVeteranId || '',
+      serviceBranch: currentUser?.serviceBranch || 'N/A',
+      yearsOfService: 0,
       physicalActivityLevel: 'Moderate' as const,
       socialInteractionLevel: 'Moderate' as const,
       sleepConsistencyLevel: 'Moderate' as const,
-      outdoorEngagementLevel: 'High' as const,
+      outdoorEngagementLevel: 'Moderate' as const,
       routineStabilityLevel: 'Moderate' as const,
-      recommendedFocus: ['Establish daily routine', 'Gradual outdoor walking', 'Connect with counselor'],
+      recommendedFocus: [],
       checkInFrequencyDays: 7,
-      streakDays: 1,
-      totalXP: 50,
+      streakDays: 0,
+      totalXP: 0,
       level: 1,
-      badges: [{ id: 'b-member', title: 'Active Member', description: 'VALOR Veteran Recovery', iconName: 'Shield', unlockedAt: '2026-09-05' }],
+      badges: [],
       currentRiskLevel: 'NORMAL' as const,
     }
   };
@@ -794,22 +843,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       [veteranId]: [...(prev[veteranId] || []), newTask]
     }));
   };
-
-  // Strict Caseload Filtering: Only veterans assigned to this counselor
-  const assignedVeterans = useMemo(() => {
-    if (!currentUser || currentUser.role !== 'counselor') return [];
-    const cId = currentUser.id;
-    const cName = currentUser.name?.toLowerCase().trim();
-
-    return allVeterans.filter(v => {
-      const vCounselorId = v.user.assignedCounselorId;
-      const vCounselorName = v.user.assignedCounselorName?.toLowerCase().trim();
-
-      const idMatch = vCounselorId && (vCounselorId === cId || cId.includes(vCounselorId) || vCounselorId.includes(cId));
-      const nameMatch = cName && vCounselorName && (vCounselorName.includes(cName) || cName.includes(vCounselorName));
-      return idMatch || nameMatch;
-    });
-  }, [allVeterans, currentUser]);
 
   const acknowledgeInsight = async (insightId: string) => {
     setAiInsights(prev =>

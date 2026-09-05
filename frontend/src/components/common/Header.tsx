@@ -1,5 +1,5 @@
 import React from 'react';
-import { Shield, Bell, LifeBuoy, UserCheck, ChevronDown, Sparkles, LogOut, CheckCircle2 } from 'lucide-react';
+import { Shield, Bell, LifeBuoy, UserCheck, ChevronDown, Sparkles, LogOut, CheckCircle2, Lock } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
 export const Header: React.FC = () => {
@@ -11,6 +11,7 @@ export const Header: React.FC = () => {
     currentVeteranUser,
     currentVeteranProfile,
     allVeterans,
+    assignedVeterans,
     activeVeteranId,
     setActiveVeteranId,
     notifications,
@@ -45,25 +46,33 @@ export const Header: React.FC = () => {
           </div>
         </div>
 
-        {/* Center: Counselor Demo Veteran Switcher */}
+        {/* Center: Counselor Demo Veteran Switcher (Strictly Assigned Clients Only) */}
         {!isVeteranUser && currentRole === 'counselor' && (
-          <div className="hidden md:flex items-center gap-2 bg-white border border-[#E8DCCE] rounded-xl px-3 py-1.5 text-xs shadow-warm">
-            <span className="label-overline text-[10px] text-[#786F68]">Monitoring Veteran:</span>
-            <div className="relative">
-              <select
-                value={activeVeteranId}
-                onChange={(e) => setActiveVeteranId(e.target.value)}
-                className="bg-[#FDF6EE] text-[#1C1917] font-bold rounded-lg px-2 py-1 pr-6 border border-[#E8DCCE] focus:outline-none focus:border-[#D96B27] appearance-none cursor-pointer text-xs"
-              >
-                {allVeterans.map(v => (
-                  <option key={v.user.id} value={v.user.id}>
-                    {v.user.name} ({v.profile.currentRiskLevel})
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="w-3.5 h-3.5 text-[#786F68] absolute right-1.5 top-2.5 pointer-events-none" />
+          assignedVeterans.length === 0 ? (
+            <div className="hidden md:flex items-center gap-1.5 bg-[#FDF2E9] border border-[#F7DFCC] rounded-xl px-3 py-1.5 text-xs shadow-warm">
+              <Lock className="w-3.5 h-3.5 text-[#8C4A1E]" />
+              <span className="label-overline text-[10px] text-[#8C4A1E]">Caseload:</span>
+              <span className="text-xs font-bold text-[#786F68]">0 Assigned Clients</span>
             </div>
-          </div>
+          ) : (
+            <div className="hidden md:flex items-center gap-2 bg-white border border-[#E8DCCE] rounded-xl px-3 py-1.5 text-xs shadow-warm">
+              <span className="label-overline text-[10px] text-[#786F68]">Monitoring Veteran:</span>
+              <div className="relative">
+                <select
+                  value={activeVeteranId}
+                  onChange={(e) => setActiveVeteranId(e.target.value)}
+                  className="bg-[#FDF6EE] text-[#1C1917] font-bold rounded-lg px-2 py-1 pr-6 border border-[#E8DCCE] focus:outline-none focus:border-[#D96B27] appearance-none cursor-pointer text-xs"
+                >
+                  {assignedVeterans.map(v => (
+                    <option key={v.user.id} value={v.user.id}>
+                      {v.user.name} ({v.profile.currentRiskLevel || 'NORMAL'})
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="w-3.5 h-3.5 text-[#786F68] absolute right-1.5 top-2.5 pointer-events-none" />
+              </div>
+            </div>
+          )
         )}
 
         {/* Right Action Bar */}

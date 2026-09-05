@@ -93,6 +93,18 @@ async def get_direct_messages(
         except Exception:
             c_uuid = None
 
+        # Confidentiality Isolation Guard
+        v_res = await db.execute(select(VeteranProfile).where(VeteranProfile.id == veteran_id))
+        vet = v_res.scalar_one_or_none()
+        if vet and vet.assigned_counselor_id:
+            assigned_c_str = str(vet.assigned_counselor_id).lower()
+            req_c_str = counselor_id.lower()
+            if req_c_str not in assigned_c_str and assigned_c_str not in req_c_str:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Access Denied: You are not the assigned counselor for this client.",
+                )
+
     # Find active conversation for this veteran (optionally filtered by counselor)
     if c_uuid:
         result = await db.execute(

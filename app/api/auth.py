@@ -72,6 +72,10 @@ async def get_demo_users(db: AsyncSession = Depends(get_db)):
             "current_streak": vet.current_streak,
             "tasks_completed": vet.tasks_completed,
             "avatarUrl": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=200",
+            "assigned_counselor_id": str(vet.assigned_counselor_id) if vet.assigned_counselor_id else None,
+            "assigned_counselor_name": vet.assigned_counselor_name,
+            "credibility_score": vet.credibility_score if vet.credibility_score is not None else 85.0,
+            "stability_score": vet.stability_score if vet.stability_score is not None else 85.0,
         })
 
     c_res = await db.execute(select(CounselorProfile).where(CounselorProfile.is_available == True))

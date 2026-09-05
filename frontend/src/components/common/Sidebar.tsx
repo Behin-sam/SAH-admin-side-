@@ -19,12 +19,13 @@ import {
   Sliders,
   Sparkles,
   Flame,
-  Award
+  Award,
+  Lock
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
 export const Sidebar: React.FC = () => {
-  const { currentRole, activeScreen, setActiveScreen, currentVeteranProfile } = useApp();
+  const { currentRole, activeScreen, setActiveScreen, currentVeteranProfile, assignedVeterans } = useApp();
 
   const veteranNav = [
     { id: 'home', label: "Today's Journey", icon: Home },
@@ -84,18 +85,27 @@ export const Sidebar: React.FC = () => {
           {navItems.map(item => {
             const Icon = item.icon;
             const isActive = activeScreen === item.id;
+            const isClientItem = currentRole === 'counselor' && [
+              'veteran-detail', 'counselor-physical', 'counselor-mental',
+              'counselor-engagement', 'checkin-history', 'task-management', 'counselor-comm'
+            ].includes(item.id);
+            const isLocked = isClientItem && assignedVeterans.length === 0;
+
             return (
               <button
                 key={item.id}
                 onClick={() => setActiveScreen(item.id)}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-bold text-xs transition-all ${
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-bold text-xs transition-all ${
                   isActive
                     ? 'bg-[#1C1917] text-white shadow-warm'
                     : 'text-[#786F68] hover:text-[#1C1917] hover:bg-white/80'
-                }`}
+                } ${isLocked ? 'opacity-70' : ''}`}
               >
-                <Icon className={`w-4 h-4 ${isActive ? 'text-[#D96B27]' : 'text-[#786F68]'}`} />
-                <span className="truncate">{item.label}</span>
+                <div className="flex items-center gap-3 truncate">
+                  <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-[#D96B27]' : 'text-[#786F68]'}`} />
+                  <span className="truncate">{item.label}</span>
+                </div>
+                {isLocked && <Lock className="w-3 h-3 text-[#786F68] shrink-0 ml-1.5 opacity-60" />}
               </button>
             );
           })}
@@ -123,12 +133,17 @@ export const Sidebar: React.FC = () => {
             </p>
           </div>
         ) : (
-          <div className="p-3 rounded-xl bg-white border border-[#E8DCCE] text-[11px] text-[#786F68] shadow-warm">
-            <div className="flex items-center gap-1.5 text-[#D96B27] font-bold mb-1 font-heading">
-              <Sparkles className="w-3.5 h-3.5" /> AI Clinical Assist
+          <div className="p-3 rounded-xl bg-white border border-[#E8DCCE] text-[11px] text-[#786F68] shadow-warm space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="flex items-center gap-1.5 text-[#D96B27] font-bold font-heading">
+                <Sparkles className="w-3.5 h-3.5" /> AI Clinical Assist
+              </span>
+              <span className="label-overline text-[9px] bg-[#F7DFCC] text-[#8C4A1E] px-1.5 py-0.5 rounded">
+                {assignedVeterans.length} Clients
+              </span>
             </div>
             <p className="text-[10px] leading-relaxed text-[#786F68]">
-              Pattern alerts provide supportive signals and never replace professional diagnostic judgment.
+              Longitudinal AI indicators and client dossiers are strictly isolated to your assigned caseload.
             </p>
           </div>
         )}
