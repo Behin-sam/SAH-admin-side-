@@ -50,28 +50,28 @@ A gamified mobile application for veterans to track their daily wellness, comple
 - **Navigation**: React Navigation (Stack + Tab)
 - **Storage**: AsyncStorage for local persistence
 - **Location**: Expo Location API
-- **Backend**: FastAPI (Python) - see `/trauma-backend`
+- **Backend**: FastAPI (Python) running on `http://localhost:8001`
 
 ## Getting Started
 
 ### Prerequisites
 - Node.js 18+
 - Expo CLI (`npm install -g expo-cli`)
-- Expo Go app on your phone (iOS/Android)
 
-### Installation
+### Installation & Launch
 
 ```bash
-# Navigate to app directory
+# 1. Navigate to app directory
 cd veteran-app
 
-# Install dependencies
+# 2. Install dependencies
 npm install
 
-# Start development server
-npm start
+# 3. Run in web browser (desktop/laptop)
+npm run web
 
-# Scan QR code with Expo Go app
+# 4. Or run on mobile phone (iOS / Android with Expo Go)
+npm start
 ```
 
 ### Running on Emulator

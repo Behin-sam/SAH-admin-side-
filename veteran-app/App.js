@@ -8,6 +8,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { StatusBar } from 'expo-status-bar';
 import { Text, View, ActivityIndicator, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFonts } from 'expo-font';
 
 import LoginScreen from './src/screens/LoginScreen';
 import AssessmentScreen from './src/screens/AssessmentScreen';
@@ -195,12 +196,38 @@ function MainStack() {
 }
 
 export default function App() {
+  const [fontsLoaded] = useFonts({
+    ...Ionicons.font,
+  });
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     checkAuth();
     setupNotifications();
+
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      try {
+        document.body.style.backgroundColor = '#EDE4D8';
+        document.body.style.margin = '0';
+        document.body.style.padding = '0';
+        const styleId = 'sah-expo-vector-icons-fonts';
+        if (!document.getElementById(styleId)) {
+          const fontUrl = require('@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf');
+          const iconFontStyles = `@font-face {
+            src: url(${fontUrl});
+            font-family: Ionicons;
+          }`;
+          const style = document.createElement('style');
+          style.id = styleId;
+          style.type = 'text/css';
+          style.appendChild(document.createTextNode(iconFontStyles));
+          document.head.appendChild(style);
+        }
+      } catch (fontErr) {
+        console.warn('Web font injection skipped:', fontErr);
+      }
+    }
   }, []);
 
   const setupNotifications = async () => {
@@ -371,7 +398,7 @@ export default function App() {
     setUser(updatedUser);
   };
 
-  if (loading) {
+  if (loading || (!fontsLoaded && Platform.OS !== 'web')) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.cream[200] }}>
         <ActivityIndicator size="large" color={theme.colors.rust[500]} />
@@ -381,10 +408,24 @@ export default function App() {
 
   return (
     <AuthContext.Provider value={{ user, setUser, login, logout, register, updatePoints }}>
-      <NavigationContainer>
-        <StatusBar style="light" />
-        {user ? <MainStack /> : <AuthStack />}
-      </NavigationContainer>
+      <View style={Platform.OS === 'web' ? {
+        flex: 1,
+        width: '100%',
+        maxWidth: 520,
+        marginHorizontal: 'auto',
+        minHeight: '100vh',
+        backgroundColor: '#FFFFFF',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 20,
+        elevation: 8,
+      } : { flex: 1 }}>
+        <NavigationContainer>
+          <StatusBar style="light" />
+          {user ? <MainStack /> : <AuthStack />}
+        </NavigationContainer>
+      </View>
     </AuthContext.Provider>
   );
 }

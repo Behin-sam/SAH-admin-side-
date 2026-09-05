@@ -53,25 +53,54 @@ support tool — it never makes autonomous decisions about care.
 
 ## Quick Start
 
+### 1. Start the Backend API (Port 8001)
 ```bash
-# 1. Install dependencies
+# Install dependencies
 pip install -r requirements.txt
 
-# 2. Set up environment
-cp .env.example .env
-# Edit .env with your Postgres URL and encryption key
-
-# 3. Run the server
-uvicorn app.main:app --reload --port 8000
-
-# 4. Run the web frontend (VALOR Theme)
-cd frontend
-npm install
-npm run dev
-
-# 5. Open API docs
-# http://localhost:8000/docs
+# Run the FastAPI server (uses pre-configured SQLite sah_local.db)
+uvicorn app.main:app --reload --port 8001
 ```
+*API is accessible at `http://localhost:8001` and Swagger docs at `http://localhost:8001/docs`.*
+
+---
+
+### 2. Run the Web Application (Port 3000)
+```bash
+# Navigate to web frontend
+cd frontend
+
+# Install packages
+npm install
+
+# Start development server
+npm run dev
+```
+*Open `http://localhost:3000` in your browser to access the Counselor Dashboard & Veteran Web Portal.*
+
+---
+
+### 3. Run the Mobile App (Expo / Web / Phone)
+```bash
+# Navigate to mobile app directory
+cd veteran-app
+
+# Install packages
+npm install
+
+# Run in web browser (centered mobile view with full icons)
+npm run web
+
+# Or scan QR code on phone via Expo Go
+npm start
+```
+*Web version opens at `http://localhost:8081`.*
+
+---
+
+### Demo Accounts
+- **Clinical Counselor**: `ananya@amrita.edu` / `password123` (Dr. Ananya Nair, MD)
+- **Veteran Comrade**: `vikram@para.gov.in` / `password123` (Capt. Vikram Rathore)
 
 ## API Endpoints & JSON Contracts
 
