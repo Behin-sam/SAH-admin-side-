@@ -22,6 +22,8 @@ import ProfileScreen from './src/screens/ProfileScreen';
 import AdminScreen from './src/screens/AdminScreen';
 import ChatScreen from './src/screens/ChatScreen';
 import CrisisScreen from './src/screens/CrisisScreen';
+import FriendsScreen from './src/screens/FriendsScreen';
+import DMScreen from './src/screens/DMScreen';
 
 import { storage } from './src/services/storage';
 import { notificationService } from './src/services/notifications';
@@ -43,6 +45,7 @@ function MainTabs() {
           if (route.name === 'Dashboard') iconName = focused ? 'home' : 'home-outline';
           else if (route.name === 'Tasks') iconName = focused ? 'checkbox' : 'checkbox-outline';
           else if (route.name === 'Groups') iconName = focused ? 'people' : 'people-outline';
+          else if (route.name === 'Friends') iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
           else if (route.name === 'Points') iconName = focused ? 'trophy' : 'trophy-outline';
           else if (route.name === 'Profile') iconName = focused ? 'person' : 'person-outline';
           return <Ionicons name={iconName} size={size} color={color} />;
@@ -72,6 +75,7 @@ function MainTabs() {
       <Tab.Screen name="Dashboard" component={DashboardScreen} />
       <Tab.Screen name="Tasks" component={TasksScreen} />
       <Tab.Screen name="Groups" component={GroupsScreen} />
+      <Tab.Screen name="Friends" component={FriendsScreen} />
       <Tab.Screen name="Points" component={PointsScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
@@ -125,6 +129,13 @@ function MainStack() {
           title: 'Counselor Chat',
           headerStyle: { backgroundColor: theme.colors.cream[200], borderBottomColor: theme.colors.cream[400], borderBottomWidth: 1 },
           headerTintColor: theme.colors.espresso[900],
+        }}
+      />
+      <Stack.Screen
+        name="DM"
+        component={DMScreen}
+        options={{
+          headerShown: false,
         }}
       />
       <Stack.Screen

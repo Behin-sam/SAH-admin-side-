@@ -20,6 +20,7 @@ import { NotificationsView } from './components/veteran/NotificationsView';
 import { SupportCounselorView } from './components/veteran/SupportCounselorView';
 import { ProfileSettingsView } from './components/veteran/ProfileSettingsView';
 import { SquadsView } from './components/veteran/SquadsView';
+import { FriendsView } from './components/veteran/FriendsView';
 
 // Counselor Views
 import { DashboardOverview } from './components/counselor/DashboardOverview';
@@ -54,6 +55,7 @@ const MainContent: React.FC = () => {
         case 'mental': return <MentalWellbeingView />;
         case 'progress': return <ProgressJourneyView />;
         case 'groups': return <SquadsView />;
+        case 'friends': return <FriendsView />;
         case 'weekly-checkin': return <WeeklyCheckInModal />;
         case 'notifications': return <NotificationsView />;
         case 'support': return <SupportCounselorView />;

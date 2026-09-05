@@ -17,6 +17,7 @@ import {
   Platform,
   RefreshControl,
   KeyboardAvoidingView,
+  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../App';
@@ -46,7 +47,65 @@ const GroupDetailScreen = ({ route, navigation }) => {
   const [joinedActivities, setJoinedActivities] = useState({});
   const [completedActivities, setCompletedActivities] = useState({});
 
+  // Squad Drill Creation State
+  const [showCreateDrillModal, setShowCreateDrillModal] = useState(false);
+  const [drillTitle, setDrillTitle] = useState('');
+  const [drillDesc, setDrillDesc] = useState('');
+  const [drillType, setDrillType] = useState('Physical');
+  const [drillPoints, setDrillPoints] = useState(20);
+  const [drillDuration, setDrillDuration] = useState(30);
+  const [creatingDrill, setCreatingDrill] = useState(false);
+
   const storageKey = user?.id ? `@sah_my_groups_${user.id}` : null;
+
+  const handleCreateDrill = async () => {
+    if (!drillTitle.trim()) {
+      if (Platform.OS === 'web') window.alert('Please provide a drill title.');
+      else Alert.alert('Missing Title', 'Please provide a drill title.');
+      return;
+    }
+    setCreatingDrill(true);
+    try {
+      const isUUID = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+      const creatorId = (user?.id && isUUID(user.id)) ? user.id : '550e8400-e29b-41d4-a716-446655440001';
+
+      const res = await groupAPI.createActivity(groupId, {
+        created_by: creatorId,
+        title: drillTitle.trim(),
+        description: drillDesc.trim() || 'Squad drill assigned by squad leader.',
+        activity_type: drillType.toLowerCase(),
+        points_per_participant: drillPoints,
+        duration_minutes: drillDuration,
+      });
+
+      const newActivity = {
+        id: res?.id || `drill-${Date.now()}`,
+        title: drillTitle.trim(),
+        description: drillDesc.trim() || 'Squad drill assigned by squad leader.',
+        activity_type: drillType.toLowerCase(),
+        points_per_participant: drillPoints,
+        duration_minutes: drillDuration,
+        participants_count: 1,
+        scheduled_at: new Date().toISOString(),
+        status: 'active',
+      };
+
+      setActivities((prev) => [newActivity, ...prev]);
+      setShowCreateDrillModal(false);
+      setDrillTitle('');
+      setDrillDesc('');
+
+      const msg = 'New squad drill deployed! Squad members can now enlist and complete it. 🎯';
+      if (Platform.OS === 'web') window.alert(msg);
+      else Alert.alert('Drill Deployed', msg);
+    } catch (err) {
+      console.warn('Error creating drill:', err);
+      if (Platform.OS === 'web') window.alert('Failed to deploy drill. Please try again.');
+      else Alert.alert('Error', 'Failed to deploy drill.');
+    } finally {
+      setCreatingDrill(false);
+    }
+  };
 
   // Load all squad details from backend
   const loadSquadDetails = useCallback(async () => {
@@ -473,6 +532,17 @@ const GroupDetailScreen = ({ route, navigation }) => {
         {/* TAB 1: ACTIVITIES / DRILLS */}
         {activeTab === 'activities' && (
           <View style={styles.tabContent}>
+            {/* Squad Leader / Member: Create Drill */}
+            {isMember && (
+              <TouchableOpacity
+                style={styles.createDrillBtn}
+                onPress={() => setShowCreateDrillModal(true)}
+              >
+                <Ionicons name="add-circle" size={18} color="#fff" style={{ marginRight: 6 }} />
+                <Text style={styles.createDrillBtnText}>Deploy Squad Drill / Mission</Text>
+              </TouchableOpacity>
+            )}
+
             {activities.length === 0 ? (
               <View style={styles.emptyCard}>
                 <Ionicons name="barbell-outline" size={36} color={theme.colors.espresso[400]} />
@@ -687,6 +757,99 @@ const GroupDetailScreen = ({ route, navigation }) => {
           </View>
         )}
       </ScrollView>
+
+      {/* Create Drill Modal */}
+      <Modal
+        visible={showCreateDrillModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowCreateDrillModal(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.modalOverlay}
+        >
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Deploy Squad Drill</Text>
+              <TouchableOpacity onPress={() => setShowCreateDrillModal(false)}>
+                <Ionicons name="close" size={22} color={theme.colors.espresso[900]} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalBody}>
+              <Text style={styles.inputLabel}>Drill Title *</Text>
+              <TextInput
+                style={styles.modalTextInput}
+                placeholder="e.g., 2km Morning Cadence Walk"
+                placeholderTextColor={theme.colors.espresso[400]}
+                value={drillTitle}
+                onChangeText={setDrillTitle}
+              />
+
+              <Text style={styles.inputLabel}>Activity Type</Text>
+              <View style={styles.typeSelectorRow}>
+                {['Physical', 'Mental', 'Social', 'Nature'].map((t) => (
+                  <TouchableOpacity
+                    key={t}
+                    style={[styles.typeOption, drillType === t && styles.typeOptionActive]}
+                    onPress={() => setDrillType(t)}
+                  >
+                    <Text style={[styles.typeOptionText, drillType === t && styles.typeOptionTextActive]}>
+                      {t}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={styles.inputLabel}>Reward XP</Text>
+              <View style={styles.typeSelectorRow}>
+                {[10, 20, 30, 50].map((pts) => (
+                  <TouchableOpacity
+                    key={pts}
+                    style={[styles.typeOption, drillPoints === pts && styles.typeOptionActive]}
+                    onPress={() => setDrillPoints(pts)}
+                  >
+                    <Text style={[styles.typeOptionText, drillPoints === pts && styles.typeOptionTextActive]}>
+                      +{pts} XP
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={styles.inputLabel}>Drill Description / Instructions</Text>
+              <TextInput
+                style={[styles.modalTextInput, { height: 70, textAlignVertical: 'top' }]}
+                placeholder="Guidelines or meeting instructions..."
+                placeholderTextColor={theme.colors.espresso[400]}
+                value={drillDesc}
+                onChangeText={setDrillDesc}
+                multiline
+              />
+            </ScrollView>
+
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={() => setShowCreateDrillModal(false)}
+              >
+                <Text style={styles.modalCancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalSubmitBtn}
+                onPress={handleCreateDrill}
+                disabled={creatingDrill || !drillTitle.trim()}
+              >
+                {creatingDrill ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.modalSubmitBtnText}>Deploy Drill</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </KeyboardAvoidingView>
   );
 };
@@ -1274,6 +1437,128 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     color: theme.colors.rust[600],
+  },
+  createDrillBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.rust[600],
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginBottom: 14,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  createDrillBtnText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  modalCard: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    maxHeight: '85%',
+    overflow: 'hidden',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.cream[300],
+    backgroundColor: theme.colors.cream[100],
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: theme.colors.espresso[900],
+  },
+  modalBody: {
+    padding: 20,
+  },
+  inputLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: theme.colors.espresso[700],
+    marginBottom: 6,
+    marginTop: 10,
+  },
+  modalTextInput: {
+    backgroundColor: theme.colors.cream[50],
+    borderWidth: 1,
+    borderColor: theme.colors.cream[400],
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 13,
+    color: theme.colors.espresso[900],
+  },
+  typeSelectorRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 4,
+  },
+  typeOption: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.cream[400],
+    backgroundColor: theme.colors.cream[50],
+  },
+  typeOptionActive: {
+    backgroundColor: theme.colors.rust[500],
+    borderColor: theme.colors.rust[600],
+  },
+  typeOptionText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: theme.colors.espresso[600],
+  },
+  typeOptionTextActive: {
+    color: '#fff',
+    fontWeight: '700',
+  },
+  modalFooter: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 10,
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.cream[300],
+    backgroundColor: theme.colors.cream[50],
+  },
+  modalCancelBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  modalCancelBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: theme.colors.espresso[500],
+  },
+  modalSubmitBtn: {
+    backgroundColor: theme.colors.rust[500],
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  modalSubmitBtnText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '800',
   },
 });
 

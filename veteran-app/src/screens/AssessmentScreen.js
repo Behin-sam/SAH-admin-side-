@@ -5,7 +5,7 @@
  * Styled with VALOR Design System
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -102,7 +102,24 @@ const AssessmentScreen = ({ navigation }) => {
   });
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [alreadyDoneToday, setAlreadyDoneToday] = useState(false);
   const [totalScore, setTotalScore] = useState(5);
+
+  const dateKey = `@sah_assessment_date_${user?.id || 'guest'}`;
+
+  // On mount — check if already done today
+  useEffect(() => {
+    const checkDone = async () => {
+      try {
+        const lastDate = await storage.get(dateKey);
+        if (lastDate === new Date().toDateString()) {
+          setAlreadyDoneToday(true);
+          setSubmitted(true);
+        }
+      } catch (e) {}
+    };
+    checkDone();
+  }, [dateKey]);
 
   const question = QUESTIONS[currentQuestion];
   const selectedOption = answers[currentQuestion] ?? 1;
@@ -130,25 +147,39 @@ const AssessmentScreen = ({ navigation }) => {
     const score = [0, 1, 2, 3, 4].reduce((sum, i) => sum + (answers[i] || 1), 0);
     setTotalScore(score);
 
-    // 1. Award +20 Valor Points immediately
-    if (updatePoints) {
-      updatePoints(20);
+    // Check if already done today (guard against double XP)
+    let xpAwarded = false;
+    try {
+      const lastDate = await storage.get(dateKey);
+      if (lastDate !== new Date().toDateString()) {
+        // First submission today — award XP
+        if (updatePoints) {
+          updatePoints(20);
+          xpAwarded = true;
+        }
+        // Save today's date
+        await storage.set(dateKey, new Date().toDateString());
+      }
+    } catch (e) {
+      // On error, still award XP (fail open)
+      if (updatePoints) updatePoints(20);
+      xpAwarded = true;
     }
 
-    // 2. Format exactly 5 items for backend validation
+    // Format exactly 5 items for backend validation
     const formattedAnswers = QUESTIONS.map((q, idx) => ({
       question_id: q.id,
       value: answers[idx] || 1,
     }));
 
-    // 3. Save locally
+    // Save locally
     try {
       await storage.saveAssessment(formattedAnswers);
     } catch (e) {
       console.warn('Storage save assessment failed:', e);
     }
 
-    // 4. Attempt live API submission
+    // Attempt live API submission
     if (user?.id) {
       try {
         await veteranAPI.submitAssessment(user.id, formattedAnswers);
@@ -246,10 +277,17 @@ const AssessmentScreen = ({ navigation }) => {
             </View>
 
             {/* Points Award Badge */}
-            <View style={styles.pointsAwardBadge}>
-              <Ionicons name="trophy" size={16} color={theme.colors.rust[600]} />
-              <Text style={styles.pointsAwardText}>+20 Valor Points Credited to Account</Text>
-            </View>
+            {alreadyDoneToday ? (
+              <View style={[styles.pointsAwardBadge, { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' }]}>
+                <Ionicons name="checkmark-circle" size={16} color="#065F46" />
+                <Text style={[styles.pointsAwardText, { color: '#065F46' }]}>Already completed today ✅ Come back tomorrow for daily XP!</Text>
+              </View>
+            ) : (
+              <View style={styles.pointsAwardBadge}>
+                <Ionicons name="trophy" size={16} color={theme.colors.rust[600]} />
+                <Text style={styles.pointsAwardText}>+20 Valor Points Credited to Account</Text>
+              </View>
+            )}
 
             {/* Return Button */}
             <TouchableOpacity

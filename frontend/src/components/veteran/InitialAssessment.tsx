@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ClipboardList,
   ArrowRight,
@@ -108,8 +108,20 @@ export const InitialAssessment: React.FC = () => {
     4: 1,
   });
   const [submitted, setSubmitted] = useState<boolean>(false);
+  const [alreadyDoneToday, setAlreadyDoneToday] = useState<boolean>(false);
   const [totalScore, setTotalScore] = useState<number>(5);
   const [submitting, setSubmitting] = useState<boolean>(false);
+
+  const storageKey = `sah_assessment_date_${activeVeteranId || 'guest'}`;
+
+  // On mount — check if already done today
+  useEffect(() => {
+    const lastDate = localStorage.getItem(storageKey);
+    if (lastDate === new Date().toDateString()) {
+      setAlreadyDoneToday(true);
+      setSubmitted(true);
+    }
+  }, [storageKey]);
 
   const currentQ = QUESTIONS[currentStep];
   const selectedValue = answers[currentStep] ?? 1;
@@ -127,8 +139,13 @@ export const InitialAssessment: React.FC = () => {
       const computedScore = Object.values(answers).reduce((sum, v) => sum + v, 0);
       setTotalScore(computedScore);
 
-      // 1. Award +20 XP
-      awardXP(20, 'Completed Harvard Trauma Clinical Assessment');
+      // 1. Award +20 XP only if not already done today
+      const alreadyDone = localStorage.getItem(storageKey) === new Date().toDateString();
+      if (!alreadyDone) {
+        awardXP(20, 'Completed Harvard Trauma Clinical Assessment');
+        // Save today's date so XP is only awarded once
+        localStorage.setItem(storageKey, new Date().toDateString());
+      }
 
       // 2. Complete starter task if pending
       const starterTask = tasks.find(
@@ -243,11 +260,18 @@ export const InitialAssessment: React.FC = () => {
             })}
           </div>
 
-          {/* Reward Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#FDF2E9] border border-[#EEBD9B] text-[#8C4A1E] text-xs font-extrabold">
-            <Award className="w-4 h-4 text-[#D96B27]" />
-            +20 Valor Points Credited to Profile
-          </div>
+          {/* Reward Badge — only shown on fresh completion */}
+          {alreadyDoneToday ? (
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-extrabold">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              Already completed today ✅ — Daily XP already earned. Come back tomorrow!
+            </div>
+          ) : (
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#FDF2E9] border border-[#EEBD9B] text-[#8C4A1E] text-xs font-extrabold">
+              <Award className="w-4 h-4 text-[#D96B27]" />
+              +20 Valor Points Credited to Profile
+            </div>
+          )}
 
           {/* Action Button */}
           <div className="pt-2">

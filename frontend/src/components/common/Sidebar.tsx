@@ -33,6 +33,7 @@ export const Sidebar: React.FC = () => {
     { id: 'mental', label: 'Mental Well-being', icon: Heart },
     { id: 'progress', label: 'Recovery Milestones', icon: Trophy },
     { id: 'groups', label: 'Squads & Peer Groups', icon: Users },
+    { id: 'friends', label: 'Comrades & DM', icon: MessageCircle },
     { id: 'weekly-checkin', label: 'Weekly Check-in', icon: CalendarCheck },
     { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'support', label: 'Support & Counselor', icon: MessageCircle },

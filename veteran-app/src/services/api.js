@@ -249,6 +249,15 @@ export const chatAPI = {
     api.post(`/veterans/${veteranId}/chat/emergency`, { content }),
 };
 
+export const friendsAPI = {
+  getFriends: (veteranId) => api.get(`/veterans/${veteranId}/friends`),
+  addFriend: (veteranId, friendVeteranId) => api.post(`/veterans/${veteranId}/friends`, { friend_veteran_id: friendVeteranId }),
+  removeFriend: (veteranId, friendId) => api.delete(`/veterans/${veteranId}/friends/${friendId}`),
+  discoverVeterans: (veteranId, search = '') => api.get(`/veterans/${veteranId}/discover`, { params: { search } }),
+  getDMThread: (veteranId, otherVeteranId) => api.get(`/veterans/${veteranId}/dm/${otherVeteranId}`),
+  sendDM: (veteranId, otherVeteranId, content) => api.post(`/veterans/${veteranId}/dm/${otherVeteranId}`, { content }),
+};
+
 export const authAPI = {
   login: (email, password, role = 'veteran') => api.post('/auth/login', { email, password, role }),
   register: (data) => api.post('/auth/register', data),

@@ -213,6 +213,12 @@ async def submit_assessment(
     if len(answers) != 5:
         raise HTTPException(status_code=400, detail="Assessment requires exactly 5 answers")
 
+    # Verify veteran exists
+    result = await db.execute(select(VeteranProfile).where(VeteranProfile.id == veteran_id))
+    veteran = result.scalar_one_or_none()
+    if not veteran:
+        raise HTTPException(status_code=404, detail="Veteran not found")
+
     # Validate answers are 1-4
     for i, answer in enumerate(answers):
         value = answer.get("value")
@@ -225,14 +231,33 @@ async def submit_assessment(
     # Calculate total score
     total_score = sum(a["value"] for a in answers)
 
-    # Store assessment (using points ledger as a lightweight store)
+    # Check if assessment already submitted today (daily XP limit)
+    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    existing_today = await db.execute(
+        select(PointsLedger).where(
+            PointsLedger.veteran_id == veteran_id,
+            PointsLedger.category == "assessment",
+            PointsLedger.created_at >= today_start,
+        )
+    )
+    already_submitted_today = existing_today.scalar_one_or_none() is not None
+
+    # Store assessment
     assessment_entry = PointsLedger(
         veteran_id=veteran_id,
-        points=0,
+        points=20 if not already_submitted_today else 0,
         reason=f"Wellness assessment submitted (score: {total_score}/20)",
         category="assessment",
     )
     db.add(assessment_entry)
+
+    # Award +20 XP only on first submission of the day
+    xp_earned = 0
+    if not already_submitted_today:
+        veteran.total_points += 20
+        xp_earned = 20
+
+    await db.commit()
 
     # Determine risk level
     if total_score <= 8:
@@ -253,6 +278,8 @@ async def submit_assessment(
         "total_score": total_score,
         "risk_level": risk_level,
         "message": message,
+        "xp_earned": xp_earned,
+        "xp_note": None if not already_submitted_today else "Daily XP already earned — assessment recorded.",
         "questions": [
             {"domain": "Intrusive Memories", "score": answers[0]["value"]},
             {"domain": "Hypervigilance", "score": answers[1]["value"]},
@@ -405,23 +432,45 @@ async def claim_reward(
     reward_id: str,
     db: AsyncSession = Depends(get_db),
 ):
-    """Claim an unlocked reward tier."""
+    """Claim an unlocked reward tier. Can only be claimed once per reward."""
     result = await db.execute(select(VeteranProfile).where(VeteranProfile.id == veteran_id))
     veteran = result.scalar_one_or_none()
     if not veteran:
         raise HTTPException(status_code=404, detail="Veteran not found")
 
-    # If UUID reward in DB
+    # Check if already claimed (prevent duplicate claims / exploit)
     try:
         r_uuid = uuid.UUID(reward_id)
+        existing_claim = await db.execute(
+            select(VeteranReward).where(
+                VeteranReward.veteran_id == veteran_id,
+                VeteranReward.reward_id == r_uuid,
+            )
+        )
+        if existing_claim.scalar_one_or_none():
+            raise HTTPException(status_code=409, detail="Reward already claimed")
+
         result = await db.execute(select(RewardTier).where(RewardTier.id == r_uuid))
         tier = result.scalar_one_or_none()
         if tier and veteran.total_points < tier.points_required:
             raise HTTPException(status_code=400, detail="Insufficient points for this reward")
-    except ValueError:
-        tier = None
 
-    # Record ledger entry
+        # Create the VeteranReward claim record
+        claim_record = VeteranReward(veteran_id=veteran_id, reward_id=r_uuid)
+        db.add(claim_record)
+    except ValueError:
+        # Non-UUID reward_id (default tier like "r1") — check by string key in ledger
+        existing = await db.execute(
+            select(PointsLedger).where(
+                PointsLedger.veteran_id == veteran_id,
+                PointsLedger.reason == f"Claimed Reward Milestone ({reward_id})",
+                PointsLedger.category == "reward_claim",
+            )
+        )
+        if existing.scalar_one_or_none():
+            raise HTTPException(status_code=409, detail="Reward already claimed")
+
+    # Record ledger entry and award bonus points
     bonus_points = 15
     veteran.total_points += bonus_points
     ledger = PointsLedger(

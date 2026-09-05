@@ -229,6 +229,7 @@ async def join_group(
         )
     )
     existing_membership = result.scalar_one_or_none()
+    is_rejoin = False
     if existing_membership:
         if existing_membership.is_active:
             return {
@@ -236,9 +237,10 @@ async def join_group(
                 "group_id": str(group.id),
                 "points_earned": 0,
             }
-        # Reactivate existing membership
+        # Reactivate existing membership — mark as rejoin (no points awarded)
         existing_membership.is_active = True
         existing_membership.joined_at = datetime.now(timezone.utc)
+        is_rejoin = True
     else:
         membership = GroupMembership(
             group_id=group_id,
@@ -248,20 +250,31 @@ async def join_group(
 
     group.member_count += 1
 
-    # Update veteran stats
+    # Update veteran stats and award points ONLY on first join, not rejoins
     result = await db.execute(select(VeteranProfile).where(VeteranProfile.id == veteran_id))
-    veteran = result.scalar_one()
-    veteran.groups_joined += 1
+    veteran = result.scalar_one_or_none()
+    if not veteran:
+        raise HTTPException(status_code=404, detail="Veteran not found")
 
-    # Award points
-    points_entry = PointsLedger(
-        veteran_id=veteran_id,
-        points=15,
-        reason=f"Joined group: {group.name}",
-        category="group_join",
-    )
-    db.add(points_entry)
-    veteran.total_points += 15
+    if not is_rejoin:
+        veteran.groups_joined += 1
+        # Award points only for first-time join
+        points_entry = PointsLedger(
+            veteran_id=veteran_id,
+            points=15,
+            reason=f"Joined group: {group.name}",
+            category="group_join",
+        )
+        db.add(points_entry)
+        veteran.total_points += 15
+
+    if is_rejoin:
+        return {
+            "message": f"Welcome back to {group.name}! 🤝",
+            "group_id": str(group.id),
+            "points_earned": 0,
+            "note": "Points are only awarded on your first join.",
+        }
 
     return {
         "message": f"Welcome to {group.name}! 🤝",
@@ -316,7 +329,7 @@ async def list_members(group_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     members = [
         {
             "veteran_id": str(m.veteran_id),
-            "name": surv.preferred_language if surv and surv.preferred_language else "Comrade",
+            "name": (surv.full_name or surv.username or "Comrade") if surv else "Comrade",
             "rank": v.rank or "Soldier",
             "service_branch": v.service_branch or "Indian Army",
             "role": m.role.value if hasattr(m.role, 'value') else str(m.role),
@@ -390,7 +403,7 @@ async def post_group_message(
         row = res.first()
         if row:
             vet, surv = row
-            name = surv.preferred_language or "Comrade"
+            name = surv.full_name or surv.username or "Comrade"
             rank = vet.rank or "Soldier"
 
     new_msg = GroupMessage(
@@ -743,7 +756,7 @@ async def log_social_interaction(
     points = 5
     if duration_minutes and duration_minutes >= 30:
         points = 10
-    if mood_after and mood_before and mood_after < mood_before:
+    if mood_after and mood_before and mood_after > mood_before:
         points += 5  # Bonus for mood improvement
 
     points_entry = PointsLedger(

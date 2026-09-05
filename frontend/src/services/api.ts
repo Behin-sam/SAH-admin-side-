@@ -196,6 +196,45 @@ export const apiService = {
     return request<any>(`/groups/${groupId}/messages/${messageId}/like`, { method: 'POST' });
   },
 
+  async createGroupActivity(groupId: string, data: { title: string; description?: string; activity_type?: string; points_per_participant?: number; created_by?: string; scheduled_at?: string; duration_minutes?: number }) {
+    const query = new URLSearchParams(data as any).toString();
+    return request<any>(`/groups/${groupId}/activities?${query}`, { method: 'POST' });
+  },
+
+  // ─── Friends & DM Endpoints ────────────────────────────────────────────────
+
+  async getFriends(veteranId: string) {
+    return request<{ veteran_id: string; friends: any[]; count: number }>(`/veterans/${veteranId}/friends`);
+  },
+
+  async addFriend(veteranId: string, friendVeteranId: string) {
+    return request<{ message: string; points_earned: number }>(`/veterans/${veteranId}/friends`, {
+      method: 'POST',
+      body: JSON.stringify({ friend_veteran_id: friendVeteranId }),
+    });
+  },
+
+  async removeFriend(veteranId: string, friendId: string) {
+    return request<{ message: string }>(`/veterans/${veteranId}/friends/${friendId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  async discoverVeterans(veteranId: string, search = '') {
+    return request<{ veterans: any[] }>(`/veterans/${veteranId}/discover${search ? `?search=${encodeURIComponent(search)}` : ''}`);
+  },
+
+  async getDMThread(veteranId: string, otherVeteranId: string) {
+    return request<{ messages: any[] }>(`/veterans/${veteranId}/dm/${otherVeteranId}`);
+  },
+
+  async sendDM(veteranId: string, otherVeteranId: string, content: string) {
+    return request<{ id: string; message: string; created_at: string }>(`/veterans/${veteranId}/dm/${otherVeteranId}`, {
+      method: 'POST',
+      body: JSON.stringify({ content }),
+    });
+  },
+
   // Health check
   async checkHealth(): Promise<boolean> {
     try {

@@ -123,18 +123,22 @@ const GroupsScreen = ({ navigation }) => {
         )
       );
 
+      let earned = 0;
       try {
         if (user?.id) {
-          await groupAPI.joinGroup(group.id, user.id);
+          const res = await groupAPI.joinGroup(group.id, user.id);
+          earned = res && typeof res.points_earned === 'number' ? res.points_earned : 15;
         }
-        if (updatePoints) {
-          await updatePoints(15);
+        if (earned > 0 && updatePoints) {
+          await updatePoints(earned);
         }
       } catch (err) {
         console.warn('Join group api fallback:', err);
       }
 
-      const joinMsg = `You are now a member of ${group.name}.\n\n+15 Valor Points awarded! 🎉`;
+      const joinMsg = earned > 0
+        ? `You are now a member of ${group.name}.\n\n+${earned} Valor Points awarded! 🎉`
+        : `Welcome back to ${group.name}! Rejoined squad (no points on rejoin).`;
       if (Platform.OS === 'web') {
         window.alert(`Squad Joined! 🤝\n\n${joinMsg}`);
       } else {
@@ -218,13 +222,16 @@ const GroupsScreen = ({ navigation }) => {
 
     setCreatingSquad(true);
     try {
+      const isUUID = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+      const creatorId = (user?.id && isUUID(user.id)) ? user.id : '550e8400-e29b-41d4-a716-446655440001';
+
       const payload = {
         name: newSquadName.trim(),
         description: newSquadDesc.trim() || 'Veteran support and wellness recovery squad.',
         category: newSquadCategory,
         max_members: 50,
         is_public: true,
-        created_by: user?.id || '550e8400-e29b-41d4-a716-446655440001',
+        created_by: creatorId,
       };
 
       const res = await groupAPI.createGroup(payload);

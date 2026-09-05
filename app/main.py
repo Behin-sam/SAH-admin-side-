@@ -8,7 +8,7 @@ OpenAPI docs at: http://localhost:8000/docs
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import survivors, consent, checkins, counselor, sync, veterans, tasks, gps, groups, admin, chat, auth
+from app.api import survivors, consent, checkins, counselor, sync, veterans, tasks, gps, groups, admin, chat, auth, friends
 from app.database import engine, Base
 from seed_demo_data import seed
 
@@ -56,6 +56,7 @@ app.include_router(gps.router)
 app.include_router(groups.router)
 app.include_router(admin.router)
 app.include_router(chat.router)
+app.include_router(friends.router)
 
 
 @app.on_event("startup")

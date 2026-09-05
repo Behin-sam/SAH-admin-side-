@@ -102,6 +102,14 @@ export const SquadsView: React.FC = () => {
   const [newSquadCategory, setNewSquadCategory] = useState<string>('Physical');
   const [creatingSquad, setCreatingSquad] = useState<boolean>(false);
 
+  // Squad Leader: Create Task for Members
+  const [showCreateTaskModal, setShowCreateTaskModal] = useState<boolean>(false);
+  const [newTaskTitle, setNewTaskTitle] = useState<string>('');
+  const [newTaskDesc, setNewTaskDesc] = useState<string>('');
+  const [newTaskType, setNewTaskType] = useState<string>('Physical');
+  const [newTaskPoints, setNewTaskPoints] = useState<number>(20);
+  const [creatingTask, setCreatingTask] = useState<boolean>(false);
+
   // Local actions tracking
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [joinedActivities, setJoinedActivities] = useState<Record<string, boolean>>({});
@@ -177,14 +185,17 @@ export const SquadsView: React.FC = () => {
           setSelectedSquad(prev => prev ? { ...prev, member_count: Math.max(0, prev.member_count - 1) } : null);
         }
       } else {
-        // Join
+        // Join (or rejoin)
         const res = await apiService.joinGroup(squad.id, vetId);
-        const updated = [...joinedGroups, squad];
+        const updated = [...joinedGroups.filter(g => g.id !== squad.id), squad];
         setJoinedGroups(updated);
         localStorage.setItem(`sah_my_groups_${vetId}`, JSON.stringify(updated));
 
-        const earned = res?.points_earned || 15;
-        awardXP(earned, `Enlisted with ${squad.name}`);
+        // Only award XP if backend says points_earned > 0 (first join only, not rejoin)
+        const earned = res?.points_earned || 0;
+        if (earned > 0) {
+          awardXP(earned, `Enlisted with ${squad.name}`);
+        }
 
         setGroups(prev =>
           prev.map(g => (g.id === squad.id ? { ...g, member_count: g.member_count + 1 } : g))
@@ -223,10 +234,9 @@ export const SquadsView: React.FC = () => {
       const pts = act.points_per_participant || 20;
       awardXP(pts, `Completed drill: ${act.title}`);
     } catch (e) {
-      // Award points anyway so veteran is credited
-      setCompletedActivities(prev => ({ ...prev, [act.id]: true }));
-      const pts = act.points_per_participant || 20;
-      awardXP(pts, `Completed drill: ${act.title}`);
+      // Do NOT award points on API failure — show error instead
+      console.warn('Activity complete error:', e);
+      alert('Could not log completion. Please check your connection and try again.');
     }
   };
 
@@ -323,6 +333,35 @@ export const SquadsView: React.FC = () => {
       console.warn('Create squad error:', err);
     } finally {
       setCreatingSquad(false);
+    }
+  };
+
+  // Squad Leader: Create a task/activity for squad members
+  const handleCreateSquadTask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTaskTitle.trim() || !selectedSquad || creatingTask) return;
+    setCreatingTask(true);
+    try {
+      await apiService.createGroupActivity(selectedSquad.id, {
+        title: newTaskTitle.trim(),
+        description: newTaskDesc.trim() || 'Squad drill assigned by squad leader.',
+        activity_type: newTaskType.toLowerCase(),
+        points_per_participant: newTaskPoints,
+        created_by: vetId,
+        scheduled_at: new Date(Date.now() + 86400000).toISOString(), // tomorrow
+        duration_minutes: 30,
+      });
+      // Refresh activities
+      const actRes = await apiService.getGroupActivities(selectedSquad.id).catch(() => ({ activities: [] }));
+      setSquadActivities(actRes?.activities || []);
+      setShowCreateTaskModal(false);
+      setNewTaskTitle('');
+      setNewTaskDesc('');
+    } catch (err) {
+      console.warn('Create squad task error:', err);
+      alert('Could not create task. Make sure you are the squad admin.');
+    } finally {
+      setCreatingTask(false);
     }
   };
 
@@ -579,6 +618,19 @@ export const SquadsView: React.FC = () => {
               ) : squadTab === 'activities' ? (
                 /* TAB 1: DRILLS & CHALLENGES */
                 <div className="space-y-3">
+                  {/* Squad Leader: Create Drill button */}
+                  {(() => {
+                    const myMembership = squadMembers.find(m => m.veteran_id === vetId);
+                    const isAdmin = myMembership?.role === 'admin' || myMembership?.role === 'leader';
+                    return isAdmin ? (
+                      <button
+                        onClick={() => setShowCreateTaskModal(true)}
+                        className="w-full py-2.5 px-4 rounded-xl border-2 border-dashed border-[#D96B27]/50 text-[#D96B27] text-xs font-bold hover:bg-[#FDF2E9] transition-all flex items-center justify-center gap-2"
+                      >
+                        <Plus className="w-4 h-4" /> Create New Squad Drill / Task
+                      </button>
+                    ) : null;
+                  })()}
                   {squadActivities.length === 0 ? (
                     <div className="py-10 text-center text-xs text-[#786F68]">
                       No active drills scheduled for this squad. Check back soon!
@@ -840,6 +892,77 @@ export const SquadsView: React.FC = () => {
                   className="px-5 py-2 rounded-xl bg-[#D96B27] hover:bg-[#C55A1A] disabled:bg-[#E8DCCE] text-white text-xs font-bold shadow-sm transition-all"
                 >
                   {creatingSquad ? 'Commissioning...' : 'Commission Squad (+25 XP)'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* CREATE SQUAD DRILL / TASK MODAL (Squad Leaders Only) */}
+      {showCreateTaskModal && selectedSquad && (
+        <div className="fixed inset-0 z-[60] bg-black/70 flex items-center justify-center p-4">
+          <div className="bg-white border border-[#E8DCCE] rounded-2xl max-w-md w-full shadow-2xl">
+            <div className="p-5 border-b border-[#E8DCCE] flex items-center justify-between">
+              <h3 className="text-sm font-extrabold text-[#1C1917]">Create Squad Drill / Task</h3>
+              <button onClick={() => setShowCreateTaskModal(false)} className="text-[#786F68] hover:text-[#1C1917]">✕</button>
+            </div>
+            <form onSubmit={handleCreateSquadTask} className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-[#1C1917] mb-1">Drill / Task Title *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. 2km Morning Walk, Meditation Session..."
+                  value={newTaskTitle}
+                  onChange={(e) => setNewTaskTitle(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-[#FDF6EE] border border-[#E8DCCE] rounded-xl text-[#1C1917] focus:outline-none focus:ring-2 focus:ring-[#D96B27]/40"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-[#1C1917] mb-1">Task Type</label>
+                <select
+                  value={newTaskType}
+                  onChange={(e) => setNewTaskType(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-[#FDF6EE] border border-[#E8DCCE] rounded-xl text-[#1C1917] focus:outline-none focus:ring-2 focus:ring-[#D96B27]/40"
+                >
+                  <option value="Physical">Physical Fitness</option>
+                  <option value="Mental">Mental Wellness</option>
+                  <option value="Social">Social Activity</option>
+                  <option value="Nature">Nature / Outdoors</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-[#1C1917] mb-1">XP Reward per Member</label>
+                <select
+                  value={newTaskPoints}
+                  onChange={(e) => setNewTaskPoints(Number(e.target.value))}
+                  className="w-full px-3 py-2 text-xs bg-[#FDF6EE] border border-[#E8DCCE] rounded-xl text-[#1C1917] focus:outline-none focus:ring-2 focus:ring-[#D96B27]/40"
+                >
+                  <option value={10}>10 XP (Easy)</option>
+                  <option value={20}>20 XP (Standard)</option>
+                  <option value={30}>30 XP (Challenge)</option>
+                  <option value={50}>50 XP (Mission)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-[#1C1917] mb-1">Description (optional)</label>
+                <textarea
+                  rows={2}
+                  placeholder="Instructions or goals for this drill..."
+                  value={newTaskDesc}
+                  onChange={(e) => setNewTaskDesc(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-[#FDF6EE] border border-[#E8DCCE] rounded-xl text-[#1C1917] focus:outline-none focus:ring-2 focus:ring-[#D96B27]/40 resize-none"
+                />
+              </div>
+              <div className="flex items-center justify-end gap-2">
+                <button type="button" onClick={() => setShowCreateTaskModal(false)} className="px-4 py-2 rounded-xl text-xs font-bold text-[#786F68] hover:bg-[#F5EBE0]">Cancel</button>
+                <button
+                  type="submit"
+                  disabled={!newTaskTitle.trim() || creatingTask}
+                  className="px-5 py-2 rounded-xl bg-[#D96B27] hover:bg-[#C55A1A] disabled:bg-[#E8DCCE] text-white text-xs font-bold shadow-sm"
+                >
+                  {creatingTask ? 'Creating...' : 'Deploy Drill'}
                 </button>
               </div>
             </form>
